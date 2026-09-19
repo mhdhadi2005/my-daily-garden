@@ -1,8 +1,9 @@
 const { db } = require("../db");
 const {
-  POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS,
+  POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS, PURCHASE_BONUS_POINTS,
   stageForPoints, STAGES, rollReward, todayStr, daysBetween,
 } = require("./config");
+
 const { linkSubscriberIfPossible } = require("../integrations/woocommerce");
 const { syncSubscriberStats } = require("../integrations/beehiiv");
 
@@ -141,4 +142,40 @@ function recordQuizAnswer({ beehiivSubscriberId, email, quizId, correct }) {
   return { subscriber: { ...sub, points: newPoints }, pointsAwarded: QUIZ_CORRECT_BONUS };
 }
 
-module.exports = { getOrCreateSubscriber, recordClick, recordOpen, recordQuizAnswer };
+/**
+ * Called when a subscriber purchases a product (via store / WooCommerce webhook).
+ */
+function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
+  const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
+  try {
+    db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
+      .run(sub.id, orderId || null, amount ? Number(amount) : null);
+  } catch (err) {
+    console.warn("Could not insert purchase_log:", err.message);
+  }
+
+  const prevStage = stageForPoints(sub.points);
+  const newPoints = sub.points + PURCHASE_BONUS_POINTS;
+  const newStage = stageForPoints(newPoints);
+
+  db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
+
+  const updatedSub = { ...sub, points: newPoints };
+  syncInBackground(updatedSub, newStage);
+
+  return {
+    subscriber: updatedSub,
+    pointsAwarded: PURCHASE_BONUS_POINTS,
+    stageChanged: newStage > prevStage,
+    newStage,
+  };
+}
+
+module.exports = {
+  getOrCreateSubscriber,
+  recordClick,
+  recordOpen,
+  recordQuizAnswer,
+  recordPurchase,
+};
+

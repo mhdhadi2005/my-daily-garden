@@ -22,6 +22,16 @@ const POINTS_PER_CLICK = 10;      // every qualifying click, equal weight
 const DAILY_CLICK_CAP = 5;        // clicks beyond this in one day don't earn points (set to Infinity to disable)
 const OPEN_BONUS_POINTS = 2;      // opens contribute a small bonus, never drive streak/growth
 const QUIZ_CORRECT_BONUS = 15;
+const PURCHASE_BONUS_POINTS = 20; // bonus points for purchasing a product
+
+const POINT_VALUES = {
+  click: POINTS_PER_CLICK,
+  open: OPEN_BONUS_POINTS,
+  quiz: QUIZ_CORRECT_BONUS,
+  purchase: PURCHASE_BONUS_POINTS,
+  dailyClickCap: DAILY_CLICK_CAP,
+};
+
 
 // Reward odds on each qualifying (points-earning) click.
 // These are the REAL odds from the spec — the boosted demo odds were only
@@ -111,6 +121,8 @@ module.exports = {
   DAILY_CLICK_CAP,
   OPEN_BONUS_POINTS,
   QUIZ_CORRECT_BONUS,
+  PURCHASE_BONUS_POINTS,
+  POINT_VALUES,
   REWARD_TABLE,
   COSMETICS,
   rollHarvestCosmetic,
@@ -119,3 +131,4 @@ module.exports = {
   todayStr,
   daysBetween,
 };
+

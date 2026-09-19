@@ -131,8 +131,10 @@
     renderRewards(data.rewards);
     renderForest(data);
     renderHarvestButton(data);
+    renderPointGuide(data.pointValues);
     updateStageSelector(newStage);
     updateParticles(newStage);
+
 
     if (shouldAnimate && currentStage >= 0) {
       $treeContainer.classList.remove("fade-out");
@@ -228,7 +230,30 @@
     }).join("");
   }
 
+  // ── Points Guide ──
+  function renderPointGuide(pointValues) {
+    if (!pointValues) return;
+    const $open = document.getElementById("guide-pts-open");
+    const $click = document.getElementById("guide-pts-click");
+    const $quiz = document.getElementById("guide-pts-quiz");
+    const $purchase = document.getElementById("guide-pts-purchase");
+
+    if ($open && pointValues.open !== undefined) {
+      $open.textContent = `+${pointValues.open} pt${pointValues.open === 1 ? "" : "s"}`;
+    }
+    if ($click && pointValues.click !== undefined) {
+      $click.textContent = `+${pointValues.click} pts`;
+    }
+    if ($quiz && pointValues.quiz !== undefined) {
+      $quiz.textContent = `+${pointValues.quiz} pts`;
+    }
+    if ($purchase && pointValues.purchase !== undefined) {
+      $purchase.textContent = `+${pointValues.purchase} pts`;
+    }
+  }
+
   // ── Forest Rendering ──
+
   function renderForest(data) {
     const totalHarvests = data.totalHarvests || 0;
     const cosmetics     = data.cosmetics || [];

@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../db");
-const { STAGES, COSMETICS, stageForPoints } = require("../engine/config");
+const { STAGES, COSMETICS, stageForPoints, POINT_VALUES } = require("../engine/config");
+
 
 const router = express.Router();
 
@@ -69,7 +70,9 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
     canHarvest:       stageIdx >= MAX_STAGE_INDEX,
     forest:           harvests,
     cosmetics:        cosmeticsEnriched,
+    pointValues:      POINT_VALUES,
   });
 });
+
 
 module.exports = router;

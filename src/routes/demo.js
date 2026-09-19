@@ -1,5 +1,6 @@
 const express = require("express");
-const { STAGES, COSMETICS } = require("../engine/config");
+const { STAGES, COSMETICS, POINT_VALUES } = require("../engine/config");
+
 
 const router = express.Router();
 
@@ -75,7 +76,9 @@ router.get("/api/demo/tree", (req, res) => {
     canHarvest:       stageIndex >= STAGES.length - 1,
     forest,
     cosmetics,
+    pointValues:      POINT_VALUES,
   });
 });
+
 
 module.exports = router;

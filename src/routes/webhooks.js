@@ -1,6 +1,8 @@
 const express = require("express");
 const crypto = require("crypto");
-const { recordClick, recordOpen, recordQuizAnswer } = require("../engine");
+const { db } = require("../db");
+const { recordClick, recordOpen, recordQuizAnswer, recordPurchase } = require("../engine");
+
 
 const router = express.Router();
 
@@ -61,5 +63,32 @@ router.post("/api/seed-subscriber", (req, res) => {
   res.json({ ok: true, result });
 });
 
+// POST /webhooks/purchase — WooCommerce / store purchase webhook
+router.post("/webhooks/purchase", (req, res) => {
+  const { subscriber_id, email, order_id, total, amount } = req.body || {};
+  if (!subscriber_id && !email) {
+    return res.status(400).json({ error: "missing subscriber_id or email" });
+  }
+
+  let beehiivId = subscriber_id;
+  if (!beehiivId && email) {
+    const sub = db.prepare("SELECT beehiiv_subscriber_id FROM subscribers WHERE email = ?").get(email);
+    if (sub) beehiivId = sub.beehiiv_subscriber_id;
+  }
+  if (!beehiivId) {
+    beehiivId = `sub_${Date.now()}`;
+  }
+
+  const result = recordPurchase({
+    beehiivSubscriberId: beehiivId,
+    email: email || "",
+    orderId: order_id,
+    amount: total || amount,
+  });
+
+  res.json({ ok: true, result });
+});
+
 module.exports = router;
+
 

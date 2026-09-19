@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS reconciliation_log (
 CREATE INDEX IF NOT EXISTS idx_click_log_subscriber_date ON click_log(subscriber_id, clicked_at);
 CREATE INDEX IF NOT EXISTS idx_open_log_subscriber_date ON open_log(subscriber_id, opened_at);
 
+CREATE TABLE IF NOT EXISTS purchase_log (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  subscriber_id  INTEGER NOT NULL REFERENCES subscribers(id),
+  order_id       TEXT,
+  amount         REAL,
+  purchased_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_purchase_log_subscriber ON purchase_log(subscriber_id);
+
+
 -- ── Forest / Prestige System ──────────────────────────────────────────────────
 -- Each row = one completed tree harvest (prestige cycle)
 CREATE TABLE IF NOT EXISTS harvests (

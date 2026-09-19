@@ -2,19 +2,20 @@ const https = require('https');
 
 const body = JSON.stringify({
   subscriber_id: 'sub_bd0a74cf-8995-4417-8cd3-18aa69a3d89e',
-  email: 'harryheyworth+fixed.secondary@gmail.com',
-  link_url: 'https://10almonds.com/article-1'
+  email: 'harryheyworth+fixed.secondary@gmail.com'
 });
 
 const options = {
   hostname: 'my-daily-garden-production.up.railway.app',
-  path: '/webhooks/beehiiv/click',
+  path: '/api/seed-subscriber',
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body)
+    'Content-Length': Buffer.byteLength(body),
+    'Authorization': 'Bearer mdg-secret-2026'
   }
 };
+
 
 const req = https.request(options, (res) => {
   let data = '';
