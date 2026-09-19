@@ -267,55 +267,94 @@
     $forestSection.style.display = "";
     $forestCount.textContent = `${totalHarvests} tree${totalHarvests !== 1 ? "s" : ""} grown`;
 
-    // Build panoramic forest scene: small completed trees, current growing tree implied
-    const CDN = "https://cdn.jsdelivr.net/gh/hfg-gmuend/openmoji/color/svg/";
-    // Completed trees use the full-grown Enchanted Grove emoji style (1F333)
-    const completedTreeEmoji = "1F333";
-
-    let sceneHTML = "";
-
-    // Completed trees (up to 6 shown, then "+N more")
-    const MAX_VISIBLE = 6;
+    // ── Build panoramic garden with real procedural mini-trees ──
+    const MAX_VISIBLE = 7;
     const visible = forest.slice(0, MAX_VISIBLE);
 
+    // Create the garden scene container
+    let gardenHTML = '<div class="garden-ground">';
+
+    // Render each completed tree as a mini procedural tree
     visible.forEach((h, i) => {
-      const treeSize = Math.max(50, 80 - i * 5); // perspective shrink
-      const cosmetic = data.cosmetics ? data.cosmetics[i] : null;
-      const cosmeticHTML = cosmetic
-        ? `<div class="forest-tree-cosmetic" title="${cosmetic.label}">${cosmetic.icon}</div>`
-        : "";
-      sceneHTML += `
-        <div class="forest-tree-item" style="animation-delay:${i * 0.12}s">
-          <img src="${CDN}${completedTreeEmoji}.svg"
-               alt="Completed Tree ${h.harvestNumber}"
-               class="forest-tree-img"
-               width="${treeSize}" height="${treeSize}"
-               title="Tree #${h.harvestNumber} — harvested with ${h.pointsAtHarvest} pts"
-          >
-          ${cosmeticHTML}
-          <span class="forest-tree-num">#${h.harvestNumber}</span>
+      const delay = i * 0.15;
+      gardenHTML += `
+        <div class="garden-tree-slot" style="animation-delay:${delay}s">
+          <div class="garden-mini-tree" id="mini-tree-${i}"
+               title="Tree #${h.harvestNumber} — harvested with ${h.pointsAtHarvest} pts"></div>
+          <span class="garden-tree-label">#${h.harvestNumber}</span>
         </div>`;
     });
 
     if (forest.length > MAX_VISIBLE) {
-      sceneHTML += `<div class="forest-tree-more">+${forest.length - MAX_VISIBLE}<br>more</div>`;
+      gardenHTML += `<div class="garden-tree-more">+${forest.length - MAX_VISIBLE}<br>more</div>`;
     }
 
-    $forestScene.innerHTML = sceneHTML;
+    gardenHTML += '</div>';
 
-    // Cosmetics shelf
+    // Roaming cosmetics layer
     if (cosmetics.length > 0) {
-      $cosmeticsShelf.style.display = "";
-      $cosmeticsGrid.innerHTML = cosmetics.map(c => `
-        <div class="cosmetic-item" data-rarity="${c.rarity || "common"}" title="${c.label}">
-          <span class="cosmetic-icon">${c.icon}</span>
-          <span class="cosmetic-name">${c.label}</span>
-          <span class="cosmetic-rarity" style="color:${RARITY_COLORS[c.rarity] || "inherit"}">${c.rarity}</span>
-        </div>`).join("");
-    } else {
-      $cosmeticsShelf.style.display = "none";
+      gardenHTML += '<div class="garden-critters">';
+      cosmetics.forEach((c, i) => {
+        const category = getCosmeticCategory(c.type);
+        const xPos = 8 + (i / cosmetics.length) * 75 + Math.random() * 10;
+        const delay = (i * 0.8) + Math.random() * 2;
+        const duration = 6 + Math.random() * 8;
+
+        if (category === 'animal') {
+          gardenHTML += `
+            <div class="garden-critter roaming" data-rarity="${c.rarity}"
+                 style="left:${xPos}%; animation-delay:${delay}s; --roam-duration:${duration}s"
+                 title="${c.label} (${c.rarity})">
+              <span class="critter-sprite">${c.icon}</span>
+              <span class="critter-label">${c.label}</span>
+            </div>`;
+        } else if (category === 'nature') {
+          gardenHTML += `
+            <div class="garden-critter planted" data-rarity="${c.rarity}"
+                 style="left:${xPos}%; animation-delay:${delay}s"
+                 title="${c.label} (${c.rarity})">
+              <span class="critter-sprite sway">${c.icon}</span>
+              <span class="critter-label">${c.label}</span>
+            </div>`;
+        } else {
+          // structures
+          gardenHTML += `
+            <div class="garden-critter structure" data-rarity="${c.rarity}"
+                 style="left:${xPos}%; animation-delay:${delay}s"
+                 title="${c.label} (${c.rarity})">
+              <span class="critter-sprite">${c.icon}</span>
+              <span class="critter-label">${c.label}</span>
+            </div>`;
+        }
+      });
+      gardenHTML += '</div>';
     }
+
+    $forestScene.innerHTML = gardenHTML;
+
+    // Now render actual mini procedural trees into each slot
+    if (typeof window.AlmondTree !== "undefined") {
+      visible.forEach((h, i) => {
+        const container = document.getElementById(`mini-tree-${i}`);
+        if (container) {
+          // Render at a mature stage (7 = Harvest Tree) with full progress
+          window.AlmondTree.render(container, 7, false, 1.0);
+        }
+      });
+    }
+
+    // Hide the old cosmetics shelf — cosmetics are now in the garden scene
+    $cosmeticsShelf.style.display = "none";
   }
+
+  function getCosmeticCategory(type) {
+    const animals = ['bunny', 'fox', 'hedgehog', 'owl', 'deer', 'peacock'];
+    const nature = ['wildflowers', 'mushroom_ring', 'lily_pond', 'rainbow_arch'];
+    if (animals.includes(type)) return 'animal';
+    if (nature.includes(type)) return 'nature';
+    return 'structure';
+  }
+
 
   // ── Harvest Button ──
   function renderHarvestButton(data) {

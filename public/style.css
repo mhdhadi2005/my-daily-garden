@@ -719,10 +719,10 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   FOREST / PRESTIGE SYSTEM
+   FOREST / PRESTIGE SYSTEM — Living Garden Scene
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Forest Section ── */
+/* ── Forest Section Container ── */
 .forest-section {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -730,6 +730,7 @@ body {
   padding: 20px;
   margin-bottom: 16px;
   backdrop-filter: blur(12px);
+  overflow: hidden;
 }
 
 .forest-header {
@@ -755,140 +756,211 @@ body {
   border-radius: 20px;
 }
 
-/* ── Forest Scene: panoramic row of completed trees ── */
+/* ── Garden Ground: the row of mini procedural trees ── */
 .forest-scene {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 8px 4px 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--glass-border) transparent;
+  position: relative;
+  min-height: 180px;
 }
 
-.forest-tree-item {
+.garden-ground {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 4px 40px; /* extra bottom padding for critters */
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border) transparent;
+  position: relative;
+  z-index: 2;
+}
+
+/* Grass strip at bottom */
+.garden-ground::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(180deg, transparent 0%, rgba(74, 122, 37, 0.08) 60%, rgba(74, 122, 37, 0.15) 100%);
+  border-radius: 0 0 14px 14px;
+  pointer-events: none;
+}
+
+/* ── Individual Tree Slot ── */
+.garden-tree-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
-  animation: forestTreeIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: gardenTreeGrow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   position: relative;
+  cursor: default;
 }
 
-@keyframes forestTreeIn {
-  from { opacity: 0; transform: translateY(20px) scale(0.7); }
+@keyframes gardenTreeGrow {
+  from { opacity: 0; transform: translateY(24px) scale(0.5); }
   to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
 
-.forest-tree-img {
+.garden-mini-tree {
+  width: 70px;
+  height: 90px;
+  position: relative;
+  transition: transform 0.25s ease;
+}
+
+.garden-mini-tree svg {
   display: block;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
-  transition: transform 0.2s ease;
-  image-rendering: crisp-edges;
+  width: 100%;
+  height: 100%;
 }
 
-.forest-tree-item:hover .forest-tree-img {
-  transform: translateY(-4px) scale(1.1);
+.garden-tree-slot:hover .garden-mini-tree {
+  transform: translateY(-4px) scale(1.08);
 }
 
-.forest-tree-cosmetic {
-  position: absolute;
-  bottom: 20px;
-  right: -6px;
-  font-size: 1.2rem;
-  animation: cosmeticBob 3s ease-in-out infinite alternate;
-}
-
-@keyframes cosmeticBob {
-  from { transform: translateY(0) rotate(-5deg); }
-  to   { transform: translateY(-4px) rotate(5deg); }
-}
-
-.forest-tree-num {
-  font-size: 0.65rem;
+.garden-tree-label {
+  font-size: 0.62rem;
   color: var(--text-muted);
   font-weight: 700;
   letter-spacing: 0.02em;
+  text-align: center;
 }
 
-.forest-tree-more {
+.garden-tree-more {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: var(--glass-bg);
   border: 2px dashed var(--glass-border);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 800;
   color: var(--text-muted);
   text-align: center;
   line-height: 1.2;
+  align-self: center;
 }
 
-/* ── Cosmetics Shelf ── */
-.cosmetics-shelf {
-  margin-top: 14px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 14px;
+/* ── Roaming Critters Layer ── */
+.garden-critters {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  height: 50px;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
 }
 
-.cosmetics-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.cosmetics-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cosmetic-item {
+.garden-critter {
+  position: absolute;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 10px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  pointer-events: auto;
   cursor: default;
+  transition: transform 0.3s ease;
 }
 
-.cosmetic-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+.garden-critter:hover {
+  transform: scale(1.3) translateY(-4px) !important;
+  z-index: 10;
 }
 
-.cosmetic-icon {
-  font-size: 1.6rem;
+.garden-critter:hover .critter-label {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.critter-sprite {
+  font-size: 1.4rem;
   line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15));
 }
 
-.cosmetic-name {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-align: center;
-  white-space: nowrap;
-}
-
-.cosmetic-rarity {
+.critter-label {
   font-size: 0.55rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 800;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  transform: translateY(4px);
+  pointer-events: none;
 }
+
+/* ── Animal critters: wander back and forth ── */
+.garden-critter.roaming {
+  animation: critterRoam var(--roam-duration, 8s) ease-in-out infinite alternate;
+}
+
+@keyframes critterRoam {
+  0%   { transform: translateX(0)    scaleX(1); }
+  45%  { transform: translateX(30px) scaleX(1); }
+  50%  { transform: translateX(30px) scaleX(-1); }
+  95%  { transform: translateX(0)    scaleX(-1); }
+  100% { transform: translateX(0)    scaleX(1); }
+}
+
+/* ── Nature: gentle sway in place ── */
+.garden-critter.planted {
+  bottom: 2px;
+}
+
+.critter-sprite.sway {
+  animation: critterSway 3s ease-in-out infinite alternate;
+  transform-origin: bottom center;
+}
+
+@keyframes critterSway {
+  0%   { transform: rotate(-4deg); }
+  100% { transform: rotate(4deg); }
+}
+
+/* ── Structures: slight bob ── */
+.garden-critter.structure {
+  bottom: 4px;
+}
+
+.garden-critter.structure .critter-sprite {
+  animation: structureBob 4s ease-in-out infinite;
+}
+
+@keyframes structureBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+
+/* ── Rarity glow effects on critters ── */
+.garden-critter[data-rarity="rare"] .critter-sprite {
+  filter: drop-shadow(0 0 6px rgba(78, 205, 196, 0.4));
+}
+.garden-critter[data-rarity="epic"] .critter-sprite {
+  filter: drop-shadow(0 0 8px rgba(199, 125, 255, 0.4));
+}
+.garden-critter[data-rarity="legendary"] .critter-sprite {
+  filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+  animation: legendaryGlow 2s ease-in-out infinite alternate;
+}
+@keyframes legendaryGlow {
+  0%   { filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.3)); }
+  100% { filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.6)); }
+}
+
+/* ── Old cosmetics shelf (hidden now, kept for backwards compat) ── */
+.cosmetics-shelf {
+  display: none !important;
+}
+
 
 /* ── Harvest Button ── */
 .harvest-section {
