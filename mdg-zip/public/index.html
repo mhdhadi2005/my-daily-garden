@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="My Daily Garden — Grow your almond tree by engaging with the 10almonds newsletter">
+  <title>My Daily Garden — 10almonds</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
+</head>
+<body>
+
+  <!-- Ambient background glow -->
+  <div class="ambient-bg"></div>
+
+  <!-- Particle container for floating effects -->
+  <div class="particle-container" id="particles"></div>
+
+  <div class="app-container">
+
+    <!-- Header -->
+    <header class="app-header">
+      <h1 class="app-title">My Daily Garden</h1>
+      <p class="app-subtitle">10almonds Newsletter</p>
+    </header>
+
+    <!-- Forest View (shown when totalHarvests > 0) -->
+    <div class="forest-section" id="forest-section" style="display:none">
+      <div class="forest-header">
+        <span class="forest-title">🌲 Your Forest</span>
+        <span class="forest-count" id="forest-count"></span>
+      </div>
+      <!-- Row of completed trees + cosmetics -->
+      <div class="forest-scene" id="forest-scene"></div>
+      <!-- Cosmetics shelf -->
+      <div class="cosmetics-shelf" id="cosmetics-shelf" style="display:none">
+        <div class="cosmetics-title">✨ Garden Decorations</div>
+        <div class="cosmetics-grid" id="cosmetics-grid"></div>
+      </div>
+    </div>
+
+    <!-- Stage Name -->
+    <div class="stage-banner">
+      <h2 class="stage-name" id="stage-name">Loading…</h2>
+      <p class="stage-description" id="stage-description"></p>
+    </div>
+
+    <!-- Tree Visualization -->
+    <div class="tree-container" id="tree-container">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Harvest Button (only shown at max stage) -->
+    <div class="harvest-section" id="harvest-section" style="display:none">
+      <button class="harvest-btn" id="harvest-btn" aria-label="Harvest your fully grown tree">
+        🌾 Harvest Your Tree
+      </button>
+      <p class="harvest-hint">Your tree is fully grown! Harvest it to add it to your forest and start a new one.</p>
+    </div>
+
+    <!-- Harvest Celebration Overlay -->
+    <div class="harvest-overlay" id="harvest-overlay" style="display:none" aria-hidden="true">
+      <div class="harvest-celebration">
+        <div class="harvest-celebration-emoji" id="harvest-emoji">🌾</div>
+        <h2 class="harvest-celebration-title">Tree Harvested!</h2>
+        <p class="harvest-celebration-sub" id="harvest-sub">Your tree joins the forest…</p>
+        <div class="harvest-cosmetic-reveal" id="harvest-cosmetic">
+          <span class="harvest-cosmetic-icon" id="harvest-cosmetic-icon">🦊</span>
+          <span class="harvest-cosmetic-label" id="harvest-cosmetic-label">You earned a Fox!</span>
+          <span class="harvest-cosmetic-rarity" id="harvest-cosmetic-rarity">common</span>
+        </div>
+        <button class="harvest-continue-btn" id="harvest-continue">Continue Growing 🌱</button>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-section" id="progress-section">
+      <div class="progress-label">
+        <span class="progress-label-current" id="progress-current"></span>
+        <span class="progress-label-next" id="progress-next"></span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+      <p class="progress-points" id="progress-points"></p>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card" id="stat-streak">
+        <span class="stat-icon">🔥</span>
+        <div class="stat-value" id="streak-value">0</div>
+        <div class="stat-label">Day Streak</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">⭐</span>
+        <div class="stat-value" id="points-value">0</div>
+        <div class="stat-label">Points</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🌲</span>
+        <div class="stat-value" id="harvests-value">0</div>
+        <div class="stat-label">Trees Grown</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">📧</span>
+        <div class="stat-value" id="opens-value">0</div>
+        <div class="stat-label">Emails Opened</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🔗</span>
+        <div class="stat-value" id="clicks-value">0</div>
+        <div class="stat-label">Links Clicked</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🏆</span>
+        <div class="stat-value" id="longest-value">0</div>
+        <div class="stat-label">Best Streak</div>
+      </div>
+    </div>
+
+    <!-- Rewards Shelf -->
+    <div class="rewards-section" id="rewards-section">
+      <div class="rewards-header">
+        <span class="rewards-title">🎁 Rewards Collected</span>
+        <span class="rewards-count" id="rewards-count"></span>
+      </div>
+      <div class="rewards-grid" id="rewards-grid">
+        <p class="rewards-empty">Click newsletter links to earn rewards!</p>
+      </div>
+    </div>
+
+    <!-- Demo Stage Selector -->
+    <div class="demo-controls" id="demo-controls">
+      <div class="demo-label">🎮 Demo — tap a stage to preview</div>
+      <div class="demo-forest-controls">
+        <label class="demo-forest-label">Forest cycles:
+          <input type="range" id="demo-harvests-slider" min="0" max="7" value="0" class="demo-slider">
+          <span id="demo-harvests-count">0</span>
+        </label>
+      </div>
+      <div class="stage-selector" id="stage-selector"></div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Powered by <a href="https://10almonds.com" target="_blank" rel="noopener">10almonds</a></p>
+    </footer>
+  </div>
+
+  <script src="tree-stages.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

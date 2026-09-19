@@ -1,0 +1,21 @@
+{
+  "name": "my-daily-garden-backend",
+  "version": "1.0.0",
+  "description": "My Daily Garden — 10almonds newsletter gamification backend",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node src/smoke-test.js",
+    "verify:beehiiv": "node src/verify-beehiiv.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}

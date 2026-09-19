@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Daily Garden — Tree Widget</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Embed overrides: no page chrome, transparent bg, compact layout */
+    body {
+      background: transparent;
+      min-height: auto;
+    }
+    .ambient-bg { display: none; }
+    .particle-container { position: absolute; }
+    .app-container {
+      padding: 12px 16px 16px;
+      min-height: auto;
+    }
+    .app-header { display: none; }
+    .app-footer { display: none; }
+    .demo-controls { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="particle-container" id="particles"></div>
+
+  <div class="app-container">
+    <div class="stage-banner">
+      <h2 class="stage-name" id="stage-name">Loading…</h2>
+      <p class="stage-description" id="stage-description"></p>
+    </div>
+
+    <div class="tree-container" id="tree-container">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <div class="progress-section" id="progress-section">
+      <div class="progress-label">
+        <span class="progress-label-current" id="progress-current"></span>
+        <span class="progress-label-next" id="progress-next"></span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+      <p class="progress-points" id="progress-points"></p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card" id="stat-streak">
+        <span class="stat-icon">🔥</span>
+        <div class="stat-value" id="streak-value">0</div>
+        <div class="stat-label">Day Streak</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">⭐</span>
+        <div class="stat-value" id="points-value">0</div>
+        <div class="stat-label">Points</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">📧</span>
+        <div class="stat-value" id="opens-value">0</div>
+        <div class="stat-label">Emails Opened</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🔗</span>
+        <div class="stat-value" id="clicks-value">0</div>
+        <div class="stat-label">Links Clicked</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">📅</span>
+        <div class="stat-value" id="engaged-value">0</div>
+        <div class="stat-label">Days Engaged</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🏆</span>
+        <div class="stat-value" id="longest-value">0</div>
+        <div class="stat-label">Best Streak</div>
+      </div>
+    </div>
+
+
+    <div class="rewards-section" id="rewards-section">
+      <div class="rewards-header">
+        <span class="rewards-title">🎁 Rewards Collected</span>
+        <span class="rewards-count" id="rewards-count"></span>
+      </div>
+      <div class="rewards-grid" id="rewards-grid">
+        <p class="rewards-empty">Click newsletter links to earn rewards!</p>
+      </div>
+    </div>
+
+    <!-- Hidden elements that app.js expects -->
+    <div id="demo-controls" style="display:none">
+      <div id="stage-selector"></div>
+    </div>
+  </div>
+
+  <script src="tree-stages.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

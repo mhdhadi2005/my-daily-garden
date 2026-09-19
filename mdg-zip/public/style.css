@@ -1,0 +1,1063 @@
+/* ===================================================================
+   My Daily Garden — Almond Tree Front-End
+   Premium dark-mode design with glassmorphism, particles, and animations
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap');
+
+/* ── Design Tokens — 10almonds brand palette ── */
+:root {
+  /* Background */
+  --bg-deep: #FAF7F2;
+  --bg-warm: #F5F0E8;
+  --bg-gradient: linear-gradient(170deg, #FAF7F2 0%, #F5F0E8 40%, #FAF7F2 100%);
+
+  /* Surface / Cards */
+  --surface: rgba(37, 34, 67, 0.04);
+  --surface-hover: rgba(37, 34, 67, 0.08);
+  --surface-border: rgba(37, 34, 67, 0.10);
+  --surface-glow: rgba(226, 157, 66, 0.10);
+
+  /* Text */
+  --text-primary: #252243;
+  --text-secondary: rgba(37, 34, 67, 0.65);
+  --text-muted: rgba(37, 34, 67, 0.40);
+
+  /* Accent Colors — 10almonds brand */
+  --gold: #E29D42;
+  --gold-light: #F3D053;
+  --gold-dim: rgba(226, 157, 66, 0.20);
+  --blossom-pink: #F2A49B;
+  --blossom-light: #FADADD;
+  --leaf-green: #7BA05B;
+  --leaf-dark: #2D5016;
+  --bark-brown: #A86D39;
+  --bark-dark: #7D471B;
+  --soil: #3D2B1F;
+  --almond-green: #7BA05B;
+  --almond-gold: #C4A35A;
+  --brand-indigo: #252243;
+  --brand-amber: #E29D42;
+  --brand-cream: #FAF7F2;
+  --brand-lilac: #A29FD4;
+  --brand-mint: #A8DEC7;
+
+  /* Reward rarity colors */
+  --rarity-common: #7BA05B;
+  --rarity-uncommon: #A29FD4;
+  --rarity-rare: #A8DEC7;
+  --rarity-epic: #E29D42;
+  --rarity-legendary: #E05C5C;
+
+  /* Sizes */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(37, 34, 67, 0.08), 0 1px 4px rgba(37, 34, 67, 0.06);
+  --shadow-glow-gold: 0 0 30px rgba(226, 157, 66, 0.12);
+  --shadow-glow-pink: 0 0 30px rgba(242, 164, 155, 0.12);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 200ms;
+  --duration-normal: 400ms;
+  --duration-slow: 800ms;
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Nunito', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.6;
+  background: var(--bg-gradient);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* ── Ambient Background ── */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.ambient-bg::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226, 157, 66, 0.06) 0%, transparent 70%);
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: ambientPulse 8s ease-in-out infinite;
+}
+
+.ambient-bg::after {
+  content: '';
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(123, 160, 91, 0.05) 0%, transparent 70%);
+  bottom: 20%;
+  right: 10%;
+  animation: ambientPulse 12s ease-in-out infinite reverse;
+}
+
+@keyframes ambientPulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+}
+
+/* ── Page Layout ── */
+.app-container {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Header ── */
+.app-header {
+  text-align: center;
+  margin-bottom: 8px;
+  width: 100%;
+}
+
+.app-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--brand-indigo) 0%, var(--brand-amber) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+/* ── Stage Name Banner ── */
+.stage-banner {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.stage-name {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.stage-description {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-weight: 400;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+/* ── Tree Container ── */
+.tree-container {
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 400 / 500;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  transition: all var(--duration-slow) var(--ease-out);
+}
+
+.tree-container svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 20px rgba(37, 34, 67, 0.12));
+  transition: all var(--duration-slow) var(--ease-out);
+}
+
+/* Tree entrance animation */
+.tree-enter svg {
+  animation: treeGrowIn 1s var(--ease-spring) forwards;
+}
+
+@keyframes treeGrowIn {
+  0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ── Progress Bar ── */
+.progress-section {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 20px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+}
+
+.progress-label-current {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.progress-label-next {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface);
+  border-radius: 100px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--surface-border);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--leaf-green) 0%, var(--gold) 100%);
+  transition: width 1s var(--ease-out);
+  position: relative;
+  min-width: 4px;
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+  border-radius: 0 100px 100px 0;
+}
+
+.progress-points {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.progress-points strong {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* Max stage (no next stage) */
+.progress-section.maxed .progress-bar-fill {
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  box-shadow: 0 0 12px rgba(218, 165, 32, 0.3);
+}
+
+/* ── Stats Grid ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #FFFFFF;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  transition: all var(--duration-fast) var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.stat-card:hover {
+  background: var(--surface-hover);
+  border-color: rgba(37, 34, 67, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(37, 34, 67, 0.12);
+}
+
+.stat-icon {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+  display: block;
+  line-height: 1;
+}
+
+.stat-value {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Streak card special glow */
+.stat-card.streak-active {
+  border-color: rgba(226, 157, 66, 0.35);
+  box-shadow: 0 0 20px rgba(226, 157, 66, 0.1);
+}
+
+.stat-card.streak-active .stat-value {
+  color: var(--brand-amber);
+}
+
+/* ── Rewards Shelf ── */
+.rewards-section {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 20px;
+}
+
+.rewards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rewards-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rewards-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.rewards-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reward-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid var(--surface-border);
+  border-radius: 9999px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  transition: all var(--duration-fast) var(--ease-out);
+  box-shadow: var(--shadow-card);
+}
+
+.reward-item:hover {
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+}
+
+.reward-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.reward-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+.reward-qty {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-left: 2px;
+}
+
+/* Reward rarity borders */
+.reward-item[data-rarity="common"] { border-color: rgba(123, 160, 91, 0.3); }
+.reward-item[data-rarity="uncommon"] { border-color: rgba(91, 155, 213, 0.3); }
+.reward-item[data-rarity="rare"] { border-color: rgba(176, 124, 216, 0.3); }
+.reward-item[data-rarity="epic"] { border-color: rgba(218, 165, 32, 0.3); }
+.reward-item[data-rarity="legendary"] {
+  border-color: rgba(224, 92, 92, 0.3);
+  box-shadow: 0 0 12px rgba(224, 92, 92, 0.08);
+  animation: legendaryPulse 3s ease-in-out infinite;
+}
+
+@keyframes legendaryPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(224, 92, 92, 0.08); }
+  50% { box-shadow: 0 0 20px rgba(224, 92, 92, 0.18); }
+}
+
+.rewards-empty {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  padding: 12px 0;
+  font-style: italic;
+}
+
+/* ── Stage Selector (Demo) ── */
+.demo-controls {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 20px;
+}
+
+.demo-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.stage-selector {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.stage-dot-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 6px 2px;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.stage-dot-wrapper:hover {
+  background: var(--surface);
+}
+
+.stage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--surface-border);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.stage-dot-wrapper.active .stage-dot {
+  background: var(--brand-amber);
+  border-color: var(--brand-amber);
+  box-shadow: 0 0 8px rgba(226, 157, 66, 0.4);
+  transform: scale(1.2);
+}
+
+.stage-dot-wrapper.passed .stage-dot {
+  background: var(--leaf-green);
+  border-color: var(--leaf-green);
+}
+
+.stage-dot-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.15;
+  max-width: 48px;
+  font-weight: 400;
+}
+
+.stage-dot-wrapper.active .stage-dot-label {
+  color: var(--brand-amber);
+  font-weight: 500;
+}
+
+/* ── Particle Container ── */
+.particle-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  opacity: 0;
+  animation: particleFloat linear forwards;
+}
+
+@keyframes particleFloat {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.5; }
+  100% { opacity: 0; transform: translateY(var(--drift-y, 200px)) translateX(var(--drift-x, 30px)) rotate(var(--spin, 180deg)); }
+}
+
+/* Particle variants */
+.particle.leaf {
+  width: 8px;
+  height: 12px;
+  background: var(--leaf-green);
+  border-radius: 0 50% 50% 50%;
+  transform-origin: center;
+}
+
+.particle.blossom {
+  width: 6px;
+  height: 6px;
+  background: var(--blossom-pink);
+  border-radius: 50%;
+}
+
+.particle.golden {
+  width: 4px;
+  height: 4px;
+  background: var(--gold);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(218, 165, 32, 0.5);
+}
+
+.particle.sparkle {
+  width: 3px;
+  height: 3px;
+  background: var(--gold-light);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(240, 208, 96, 0.6);
+}
+
+.particle.soil {
+  width: 4px;
+  height: 4px;
+  background: var(--soil);
+  border-radius: 50%;
+  opacity: 0.5;
+}
+
+/* ── Loading State ── */
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--surface);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 60px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Transitions for stage change ── */
+.fade-out {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: all 0.3s var(--ease-out);
+}
+
+.fade-in {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.5s var(--ease-out);
+}
+
+/* ── Tree SVG Animations (injected by tree-stages.js) ── */
+@keyframes sway {
+  0%, 100% { transform: rotate(var(--sway-start, -2deg)); }
+  50% { transform: rotate(var(--sway-end, 2deg)); }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes petalDrift {
+  0% { opacity: 0.8; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--petal-dx, 40px), var(--petal-dy, 80px)) rotate(var(--petal-rot, 180deg)); }
+}
+
+/* ── Footer ── */
+.app-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.app-footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--duration-fast);
+}
+
+.app-footer a:hover {
+  color: var(--gold);
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .app-container {
+    padding: 16px 16px 32px;
+  }
+
+  .stage-name {
+    font-size: 1.35rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-card {
+    padding: 10px 12px;
+  }
+
+  .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .stage-dot-label {
+    font-size: 0.5rem;
+  }
+
+  .tree-container {
+    max-width: 320px;
+  }
+}
+
+@media (max-width: 360px) {
+  .stats-grid {
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 10px 12px;
+  }
+
+  .reward-item {
+    padding: 6px 8px;
+  }
+}
+
+/* ── Utility Classes ── */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOREST / PRESTIGE SYSTEM
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Forest Section ── */
+.forest-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.forest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.forest-title {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.forest-count {
+  font-size: 0.8rem;
+  color: var(--brand-amber);
+  font-weight: 700;
+  background: rgba(226, 157, 66, 0.15);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ── Forest Scene: panoramic row of completed trees ── */
+.forest-scene {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 8px 4px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border) transparent;
+}
+
+.forest-tree-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  animation: forestTreeIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  position: relative;
+}
+
+@keyframes forestTreeIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.7); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+.forest-tree-img {
+  display: block;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  transition: transform 0.2s ease;
+  image-rendering: crisp-edges;
+}
+
+.forest-tree-item:hover .forest-tree-img {
+  transform: translateY(-4px) scale(1.1);
+}
+
+.forest-tree-cosmetic {
+  position: absolute;
+  bottom: 20px;
+  right: -6px;
+  font-size: 1.2rem;
+  animation: cosmeticBob 3s ease-in-out infinite alternate;
+}
+
+@keyframes cosmeticBob {
+  from { transform: translateY(0) rotate(-5deg); }
+  to   { transform: translateY(-4px) rotate(5deg); }
+}
+
+.forest-tree-num {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.forest-tree-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 2px dashed var(--glass-border);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ── Cosmetics Shelf ── */
+.cosmetics-shelf {
+  margin-top: 14px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 14px;
+}
+
+.cosmetics-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cosmetics-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cosmetic-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: default;
+}
+
+.cosmetic-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+
+.cosmetic-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.cosmetic-name {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cosmetic-rarity {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+}
+
+/* ── Harvest Button ── */
+.harvest-section {
+  text-align: center;
+  margin: 12px 0 4px;
+}
+
+.harvest-btn {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  font-weight: 900;
+  padding: 14px 32px;
+  border: none;
+  border-radius: 50px;
+  background: linear-gradient(135deg, var(--brand-amber), #c8860a);
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 20px rgba(226, 157, 66, 0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s;
+  animation: harvestPulse 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes harvestPulse {
+  from { box-shadow: 0 4px 20px rgba(226,157,66,0.4); }
+  to   { box-shadow: 0 6px 32px rgba(226,157,66,0.8); transform: scale(1.02); }
+}
+
+.harvest-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 8px 32px rgba(226,157,66,0.7);
+}
+
+.harvest-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.harvest-hint {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Harvest Celebration Overlay ── */
+.harvest-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 30, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.harvest-celebration {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 40px 32px;
+  text-align: center;
+  max-width: 380px;
+  width: 100%;
+  animation: celebrationIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes celebrationIn {
+  from { opacity: 0; transform: scale(0.6) translateY(40px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+.harvest-celebration-emoji {
+  font-size: 5rem;
+  line-height: 1;
+  margin-bottom: 12px;
+  animation: emojiSpin 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes emojiSpin {
+  from { transform: scale(0) rotate(-180deg); }
+  to   { transform: scale(1) rotate(0deg); }
+}
+
+.harvest-celebration-title {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--brand-amber);
+  margin-bottom: 8px;
+}
+
+.harvest-celebration-sub {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.harvest-cosmetic-reveal {
+  background: rgba(226, 157, 66, 0.1);
+  border: 1px solid rgba(226, 157, 66, 0.3);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: cosmeticReveal 0.8s 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes cosmeticReveal {
+  from { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+  to   { opacity: 1; transform: scale(1)   rotate(0deg); }
+}
+
+.harvest-cosmetic-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.harvest-cosmetic-label {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.harvest-cosmetic-rarity {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.harvest-continue-btn {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 12px 28px;
+  border: none;
+  border-radius: 50px;
+  background: linear-gradient(135deg, var(--brand-indigo), #3d3870);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.harvest-continue-btn:hover {
+  transform: scale(1.05);
+}
+
+/* ── Demo slider ── */
+.demo-forest-controls {
+  margin-bottom: 10px;
+}
+
+.demo-forest-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-slider {
+  accent-color: var(--brand-amber);
+  width: 120px;
+}
+
