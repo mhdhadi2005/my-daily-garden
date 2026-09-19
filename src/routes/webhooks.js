@@ -47,4 +47,19 @@ router.post("/webhooks/beehiiv/open", (req, res) => {
   res.json({ ok: true, result });
 });
 
+// POST /api/seed-subscriber — admin-only route to manually create a subscriber
+// Protected by BEEHIIV_WEBHOOK_SECRET as a bearer token.
+router.post("/api/seed-subscriber", (req, res) => {
+  const auth = (req.headers["authorization"] || "").replace("Bearer ", "");
+  if (auth !== process.env.BEEHIIV_WEBHOOK_SECRET) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  const { subscriber_id, email } = req.body || {};
+  if (!subscriber_id || !email) return res.status(400).json({ error: "missing subscriber_id or email" });
+
+  const result = recordClick({ beehiivSubscriberId: subscriber_id, email, linkUrl: "https://seed", linkId: "seed" });
+  res.json({ ok: true, result });
+});
+
 module.exports = router;
+
