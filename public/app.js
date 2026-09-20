@@ -318,15 +318,18 @@
       $gardenBackdrop.appendChild(el);
     });
 
-    // Render procedural trees into each backdrop slot
+    // Render procedural trees into each backdrop slot — same stage as main tree
+    const mainStage = data.stage ? data.stage.index : 13;
+    const mainProgress = data.stageProgress || 0.5;
     if (typeof window.AlmondTree !== "undefined") {
       positions.forEach(p => {
         const container = document.getElementById(`backdrop-tree-${p.index}`);
         if (container) {
-          window.AlmondTree.render(container, 7, false, 1.0);
+          window.AlmondTree.render(container, mainStage, false, mainProgress);
         }
       });
     }
+
 
     // Show "+N more" if needed
     if (forest.length > MAX_VISIBLE) {
