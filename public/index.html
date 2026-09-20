@@ -24,30 +24,24 @@
       <p class="app-subtitle">10almonds Newsletter</p>
     </header>
 
-    <!-- Forest View (shown when totalHarvests > 0) -->
-    <div class="forest-section" id="forest-section" style="display:none">
-      <div class="forest-header">
-        <span class="forest-title">🌲 Your Forest</span>
-        <span class="forest-count" id="forest-count"></span>
-      </div>
-      <!-- Row of completed trees + cosmetics -->
-      <div class="forest-scene" id="forest-scene"></div>
-      <!-- Cosmetics shelf -->
-      <div class="cosmetics-shelf" id="cosmetics-shelf" style="display:none">
-        <div class="cosmetics-title">✨ Garden Decorations</div>
-        <div class="cosmetics-grid" id="cosmetics-grid"></div>
-      </div>
-    </div>
-
     <!-- Stage Name -->
     <div class="stage-banner">
       <h2 class="stage-name" id="stage-name">Loading…</h2>
       <p class="stage-description" id="stage-description"></p>
     </div>
 
-    <!-- Tree Visualization -->
-    <div class="tree-container" id="tree-container">
-      <div class="loading-spinner"></div>
+    <!-- Unified Garden Scene: main tree + harvested forest + critters -->
+    <div class="garden-scene" id="garden-scene">
+      <!-- Harvested trees rendered behind/beside the main tree -->
+      <div class="garden-backdrop" id="garden-backdrop"></div>
+
+      <!-- Main growing tree (center) -->
+      <div class="tree-container" id="tree-container">
+        <div class="loading-spinner"></div>
+      </div>
+
+      <!-- Cosmetic critters roaming at the bottom -->
+      <div class="garden-critters" id="garden-critters"></div>
     </div>
 
     <!-- Harvest Button (only shown at max stage) -->
@@ -85,7 +79,16 @@
       <p class="progress-points" id="progress-points"></p>
     </div>
 
+    <!-- Hidden legacy elements (needed by JS refs) -->
+    <div id="forest-section" style="display:none"></div>
+    <div id="forest-scene" style="display:none"></div>
+    <div id="forest-count" style="display:none"></div>
+    <div id="cosmetics-shelf" style="display:none"></div>
+    <div id="cosmetics-grid" style="display:none"></div>
+
+
     <!-- Stats Grid -->
+
     <div class="stats-grid">
       <div class="stat-card" id="stat-streak">
         <span class="stat-icon">🔥</span>

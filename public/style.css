@@ -190,18 +190,111 @@ body {
   transition: all var(--duration-normal) var(--ease-out);
 }
 
-/* ── Tree Container ── */
+/* ── Garden Scene (unified: main tree + forest backdrop + critters) ── */
+.garden-scene {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 12px;
+  min-height: 320px;
+}
+
+.garden-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.backdrop-tree {
+  position: absolute;
+  bottom: 10%;
+  width: 160px;
+  height: 200px;
+  transform-origin: bottom center;
+  animation: backdropFadeIn 0.6s ease both;
+  opacity: 0.55;
+  transition: opacity 0.3s ease;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.backdrop-tree:hover {
+  opacity: 0.85;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; transform: scale(0.3) translateY(30px); }
+  to   { opacity: 0.55; }
+}
+
+.backdrop-tree-inner {
+  width: 100%;
+  height: 100%;
+}
+
+.backdrop-tree-inner svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));
+}
+
+.backdrop-tree-label {
+  display: block;
+  text-align: center;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-top: -4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.backdrop-tree:hover .backdrop-tree-label {
+  opacity: 1;
+}
+
+.backdrop-more-badge {
+  position: absolute;
+  bottom: 15%;
+  left: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  background: var(--glass-bg);
+  border: 1px dashed var(--glass-border);
+  border-radius: 20px;
+  padding: 3px 10px;
+  z-index: 5;
+}
+
+/* ── Critters Layer (bottom of garden scene) ── */
+.garden-critters {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  z-index: 15;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ── Tree Container (main tree, center of scene) ── */
 .tree-container {
   width: 100%;
   max-width: 380px;
   aspect-ratio: 400 / 500;
   position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 12px;
   transition: all var(--duration-slow) var(--ease-out);
 }
+
 
 .tree-container svg {
   width: 100%;

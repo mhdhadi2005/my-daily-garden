@@ -56,12 +56,15 @@
   const $rewardsCount     = document.getElementById("rewards-count");
   const $stageSelector    = document.getElementById("stage-selector");
   const $particleContainer = document.getElementById("particles");
-  // Forest
+  // Forest / Garden scene
   const $forestSection    = document.getElementById("forest-section");
   const $forestCount      = document.getElementById("forest-count");
   const $forestScene      = document.getElementById("forest-scene");
   const $cosmeticsShelf   = document.getElementById("cosmetics-shelf");
   const $cosmeticsGrid    = document.getElementById("cosmetics-grid");
+  const $gardenBackdrop   = document.getElementById("garden-backdrop");
+  const $gardenCritters   = document.getElementById("garden-critters");
+
   // Harvest
   const $harvestSection   = document.getElementById("harvest-section");
   const $harvestBtn       = document.getElementById("harvest-btn");
@@ -252,99 +255,108 @@
     }
   }
 
-  // ── Forest Rendering ──
+  // ── Forest Rendering (into unified garden scene) ──
 
   function renderForest(data) {
     const totalHarvests = data.totalHarvests || 0;
     const cosmetics     = data.cosmetics || [];
     const forest        = data.forest    || [];
 
+    if (!$gardenBackdrop || !$gardenCritters) return;
+
+    // Clear previous renders
+    $gardenBackdrop.innerHTML = "";
+    $gardenCritters.innerHTML = "";
+
     if (totalHarvests === 0) {
-      $forestSection.style.display = "none";
+      $gardenBackdrop.style.display = "none";
+      $gardenCritters.style.display = "none";
       return;
     }
 
-    $forestSection.style.display = "";
-    $forestCount.textContent = `${totalHarvests} tree${totalHarvests !== 1 ? "s" : ""} grown`;
+    $gardenBackdrop.style.display = "";
+    $gardenCritters.style.display = "";
 
-    // ── Build panoramic garden with real procedural mini-trees ──
-    const MAX_VISIBLE = 7;
+    // ── Render harvested mini trees flanking the main tree ──
+    // Position them left and right of center, alternating sides
+    const MAX_VISIBLE = 6;
     const visible = forest.slice(0, MAX_VISIBLE);
 
-    // Create the garden scene container
-    let gardenHTML = '<div class="garden-ground">';
-
-    // Render each completed tree as a mini procedural tree
+    // Layout: trees go alternating left/right, closest to center first
+    // Positions from center: ±1, ±2, ±3 (scaled by offset)
+    const positions = [];
     visible.forEach((h, i) => {
-      const delay = i * 0.15;
-      gardenHTML += `
-        <div class="garden-tree-slot" style="animation-delay:${delay}s">
-          <div class="garden-mini-tree" id="mini-tree-${i}"
-               title="Tree #${h.harvestNumber} — harvested with ${h.pointsAtHarvest} pts"></div>
-          <span class="garden-tree-label">#${h.harvestNumber}</span>
-        </div>`;
+      const side = i % 2 === 0 ? -1 : 1; // alternate left/right
+      const slot = Math.floor(i / 2) + 1; // 1, 1, 2, 2, 3, 3
+      const offset = slot * 85; // px from center edge
+      const scale = Math.max(0.45, 0.7 - slot * 0.08); // closer = bigger
+      const zIndex = 10 - slot;
+      positions.push({ harvest: h, side, offset, scale, zIndex, index: i });
     });
 
-    if (forest.length > MAX_VISIBLE) {
-      gardenHTML += `<div class="garden-tree-more">+${forest.length - MAX_VISIBLE}<br>more</div>`;
-    }
+    positions.forEach(p => {
+      const el = document.createElement("div");
+      el.className = "backdrop-tree";
+      el.title = `Tree #${p.harvest.harvestNumber} — ${p.harvest.pointsAtHarvest} pts`;
+      el.style.cssText = `
+        ${p.side < 0 ? "right" : "left"}: calc(50% + ${p.offset}px);
+        transform: scale(${p.scale});
+        z-index: ${p.zIndex};
+        animation-delay: ${p.index * 0.12}s;
+      `;
 
-    gardenHTML += '</div>';
+      const treeBox = document.createElement("div");
+      treeBox.className = "backdrop-tree-inner";
+      treeBox.id = `backdrop-tree-${p.index}`;
+      el.appendChild(treeBox);
 
-    // Roaming cosmetics layer
-    if (cosmetics.length > 0) {
-      gardenHTML += '<div class="garden-critters">';
-      cosmetics.forEach((c, i) => {
-        const category = getCosmeticCategory(c.type);
-        const xPos = 8 + (i / cosmetics.length) * 75 + Math.random() * 10;
-        const delay = (i * 0.8) + Math.random() * 2;
-        const duration = 6 + Math.random() * 8;
+      const label = document.createElement("span");
+      label.className = "backdrop-tree-label";
+      label.textContent = `#${p.harvest.harvestNumber}`;
+      el.appendChild(label);
 
-        if (category === 'animal') {
-          gardenHTML += `
-            <div class="garden-critter roaming" data-rarity="${c.rarity}"
-                 style="left:${xPos}%; animation-delay:${delay}s; --roam-duration:${duration}s"
-                 title="${c.label} (${c.rarity})">
-              <span class="critter-sprite">${c.icon}</span>
-              <span class="critter-label">${c.label}</span>
-            </div>`;
-        } else if (category === 'nature') {
-          gardenHTML += `
-            <div class="garden-critter planted" data-rarity="${c.rarity}"
-                 style="left:${xPos}%; animation-delay:${delay}s"
-                 title="${c.label} (${c.rarity})">
-              <span class="critter-sprite sway">${c.icon}</span>
-              <span class="critter-label">${c.label}</span>
-            </div>`;
-        } else {
-          // structures
-          gardenHTML += `
-            <div class="garden-critter structure" data-rarity="${c.rarity}"
-                 style="left:${xPos}%; animation-delay:${delay}s"
-                 title="${c.label} (${c.rarity})">
-              <span class="critter-sprite">${c.icon}</span>
-              <span class="critter-label">${c.label}</span>
-            </div>`;
-        }
-      });
-      gardenHTML += '</div>';
-    }
+      $gardenBackdrop.appendChild(el);
+    });
 
-    $forestScene.innerHTML = gardenHTML;
-
-    // Now render actual mini procedural trees into each slot
+    // Render procedural trees into each backdrop slot
     if (typeof window.AlmondTree !== "undefined") {
-      visible.forEach((h, i) => {
-        const container = document.getElementById(`mini-tree-${i}`);
+      positions.forEach(p => {
+        const container = document.getElementById(`backdrop-tree-${p.index}`);
         if (container) {
-          // Render at a mature stage (7 = Harvest Tree) with full progress
           window.AlmondTree.render(container, 7, false, 1.0);
         }
       });
     }
 
-    // Hide the old cosmetics shelf — cosmetics are now in the garden scene
-    $cosmeticsShelf.style.display = "none";
+    // Show "+N more" if needed
+    if (forest.length > MAX_VISIBLE) {
+      const more = document.createElement("div");
+      more.className = "backdrop-more-badge";
+      more.textContent = `+${forest.length - MAX_VISIBLE} more`;
+      $gardenBackdrop.appendChild(more);
+    }
+
+    // ── Render critters at the bottom of the scene ──
+    if (cosmetics.length > 0) {
+      cosmetics.forEach((c, i) => {
+        const category = getCosmeticCategory(c.type);
+        const xPos = 10 + (i / cosmetics.length) * 70 + Math.random() * 12;
+        const delay = (i * 0.6) + Math.random() * 2;
+        const duration = 6 + Math.random() * 8;
+
+        const critter = document.createElement("div");
+        critter.className = `garden-critter ${category === "animal" ? "roaming" : category === "nature" ? "planted" : "structure"}`;
+        critter.dataset.rarity = c.rarity;
+        critter.title = `${c.label} (${c.rarity})`;
+        critter.style.cssText = `left:${xPos}%; animation-delay:${delay}s; --roam-duration:${duration}s`;
+
+        critter.innerHTML = `
+          <span class="critter-sprite ${category === "nature" ? "sway" : ""}">${c.icon}</span>
+          <span class="critter-label">${c.label}</span>
+        `;
+        $gardenCritters.appendChild(critter);
+      });
+    }
   }
 
   function getCosmeticCategory(type) {
@@ -354,6 +366,7 @@
     if (nature.includes(type)) return 'nature';
     return 'structure';
   }
+
 
 
   // ── Harvest Button ──
