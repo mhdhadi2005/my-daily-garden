@@ -8,6 +8,7 @@ const harvestRoutes = require("./routes/harvest");
 const wpAuthRoutes  = require("./routes/wp-auth");
 const demoRoutes    = require("./routes/demo");
 const jobRoutes     = require("./routes/jobs");
+const { startScheduler } = require("./jobs/scheduler");
 
 initSchema();
 
@@ -33,6 +34,9 @@ app.get("/health", (req, res) => res.json({ ok: true }));
 const PORT = process.env.PORT || 3001;
 if (require.main === module) {
   app.listen(PORT, () => console.log(`My Daily Garden backend listening on :${PORT}`));
+  // Only when run as the real server — importing the app for tests shouldn't
+  // start background timers.
+  startScheduler();
 }
 
 module.exports = app;
