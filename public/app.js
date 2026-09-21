@@ -12,21 +12,30 @@
   const REAL_API = "/api/tree/";
 
   const REWARD_META = {
-    butterfly:  { icon: "🦋", label: "Butterfly",   rarity: "common" },
-    bird:       { icon: "🐦", label: "Songbird",    rarity: "uncommon" },
-    rare_seed:  { icon: "🌱", label: "Rare Seed",   rarity: "rare" },
-    golden_can: { icon: "✨", label: "Golden Can",  rarity: "epic" },
-    rainbow:    { icon: "🌈", label: "Rainbow",     rarity: "epic" },
-    legendary:  { icon: "👑", label: "Legendary",   rarity: "legendary" },
+    butterfly:  { art: "butterfly",  label: "Butterfly",  rarity: "common" },
+    bird:       { art: "bird",       label: "Songbird",   rarity: "uncommon" },
+    rare_seed:  { art: "rare_seed",  label: "Rare Seed",  rarity: "rare" },
+    golden_can: { art: "golden_can", label: "Golden Can", rarity: "epic" },
+    rainbow:    { art: "rainbow",    label: "Rainbow",    rarity: "epic" },
+    legendary:  { art: "legendary",  label: "Legendary",  rarity: "legendary" },
   };
 
   const RARITY_COLORS = {
     common:    "var(--text-muted)",
-    uncommon:  "#6BCB77",
-    rare:      "#4ECDC4",
-    epic:      "#C77DFF",
-    legendary: "#FFD700",
+    uncommon:  "#3E8E5A",
+    rare:      "#2E8B8B",
+    epic:      "#B48CD6",
+    legendary: "#E0912A",
   };
+
+  // Swaps every [data-icon] placeholder for its drawn SVG (see artwork.js)
+  function paintIcons(root) {
+    if (!window.Art) return;
+    (root || document).querySelectorAll("[data-icon]").forEach((el) => {
+      const size = parseInt(el.dataset.iconSize || "22", 10);
+      el.innerHTML = window.Art.icon(el.dataset.icon, size);
+    });
+  }
 
   // ── State ──
   let currentStage      = -1;
@@ -91,6 +100,7 @@
       setupDemoControls();
     }
 
+    paintIcons();
     buildStageSelector();
     fetchAndRender(0);
     setupHarvestButton();
@@ -134,6 +144,7 @@
     renderRewards(data.rewards);
     renderForest(data);
     renderHarvestButton(data);
+
     renderPointGuide(data.pointValues);
     updateStageSelector(newStage);
     updateParticles(newStage);
@@ -224,9 +235,10 @@
     const totalCount = rewards.reduce((sum, r) => sum + r.count, 0);
     $rewardsCount.textContent = `${totalCount} total`;
     $rewardsGrid.innerHTML = rewards.map(r => {
-      const meta = REWARD_META[r.reward_type] || { icon: "🎁", label: r.reward_type, rarity: "common" };
+      const meta = REWARD_META[r.reward_type] || { art: "", label: r.reward_type, rarity: "common" };
+      const art = window.Art ? window.Art.badge(meta.art, 30) : "";
       return `<div class="reward-item" data-rarity="${meta.rarity}">
-        <span class="reward-icon">${meta.icon}</span>
+        <span class="reward-icon">${art}</span>
         <span class="reward-name">${meta.label}</span>
         <span class="reward-qty">×${r.count}</span>
       </div>`;
@@ -257,107 +269,126 @@
 
   // ── Forest Rendering (into unified garden scene) ──
 
+  const GROVE_MAX_TREES = 9;
+
+  // The tree renderer draws well outside its 400x550 viewBox at late stages and
+  // paints two full-bleed tint rects. In the full-width hero that's invisible,
+  // but in a small grove tile the rects show up as boxes and the canopy gets
+  // clipped. Strip the rects, then refit the viewBox to the real content.
+  function fitTreeToBox(container) {
+    const svg = container.querySelector("svg");
+    if (!svg) return;
+
+    svg.querySelectorAll("rect").forEach((r) => {
+      if (parseFloat(r.getAttribute("width")) >= 400 && parseFloat(r.getAttribute("height")) >= 550) {
+        r.remove();
+      }
+    });
+
+    let box;
+    try { box = svg.getBBox(); } catch (_) { return; }
+    if (!box || !box.width || !box.height) return;
+
+    const pad = 8;
+    svg.setAttribute("viewBox", `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
+  }
+
+  // A harvested tree completed its whole cycle, so it should be drawn at the
+  // stage it reached at harvest — not at whatever stage the current tree is.
+  function stageIndexForPoints(points) {
+    const stages = (window.AlmondTree && window.AlmondTree.stages) || [];
+    let idx = 0;
+    for (let i = 0; i < stages.length; i++) {
+      if (points >= stages[i].need) idx = i;
+    }
+    return idx;
+  }
+
   function renderForest(data) {
     const totalHarvests = data.totalHarvests || 0;
     const cosmetics     = data.cosmetics || [];
     const forest        = data.forest    || [];
 
-    if (!$gardenBackdrop || !$gardenCritters) return;
+    if (!$gardenBackdrop) return;
 
-    // Clear previous renders
     $gardenBackdrop.innerHTML = "";
-    $gardenCritters.innerHTML = "";
+    if ($gardenCritters) {
+      $gardenCritters.innerHTML = "";
+      $gardenCritters.style.display = "none";
+    }
 
     if (totalHarvests === 0) {
       $gardenBackdrop.style.display = "none";
-      $gardenCritters.style.display = "none";
       return;
     }
-
     $gardenBackdrop.style.display = "";
-    $gardenCritters.style.display = "";
 
-    // ── Render harvested mini trees flanking the main tree ──
-    // Position them left and right of center, alternating sides
-    const MAX_VISIBLE = 6;
-    const visible = forest.slice(0, MAX_VISIBLE);
+    // The current growing tree stays the hero (rendered in #tree-container).
+    // This is the grove of past harvests: trees staggered across two depth
+    // rows so it reads as a little treeline rather than a row of clones.
+    const head = document.createElement("div");
+    head.className = "grove-head";
+    head.innerHTML =
+      `<span class="grove-title">Your Forest</span>` +
+      `<span class="grove-count">${totalHarvests} tree${totalHarvests === 1 ? "" : "s"} grown</span>`;
+    $gardenBackdrop.appendChild(head);
 
-    // Layout: trees go alternating left/right, closest to center first
-    // Positions from center: ±1, ±2, ±3 (scaled by offset)
-    const positions = [];
-    visible.forEach((h, i) => {
-      const side = i % 2 === 0 ? -1 : 1; // alternate left/right
-      const slot = Math.floor(i / 2) + 1; // 1, 1, 2, 2, 3, 3
-      const offset = slot * 85; // px from center edge
-      const scale = Math.max(0.45, 0.7 - slot * 0.08); // closer = bigger
-      const zIndex = 10 - slot;
-      positions.push({ harvest: h, side, offset, scale, zIndex, index: i });
+    const scene = document.createElement("div");
+    scene.className = "grove-scene";
+    $gardenBackdrop.appendChild(scene);
+
+    const shown  = forest.slice(0, GROVE_MAX_TREES);
+    const hidden = forest.length - shown.length;
+
+    shown.forEach((h, i) => {
+      const isBack = i % 2 === 1;
+      const x = ((i + 0.5) / shown.length) * 100;
+      const num = h.harvestNumber || i + 1;
+      const pts = h.pointsAtHarvest || 0;
+
+      const slot = document.createElement("div");
+      slot.className = `grove-tree ${isBack ? "is-back" : "is-front"}`;
+      slot.style.cssText = `left:${x.toFixed(2)}%; --d:${(i * 0.06).toFixed(2)}s`;
+      slot.title = `Tree #${num} — harvested at ${pts} pts`;
+
+      const art = document.createElement("div");
+      art.className = "grove-tree-art";
+      art.id = `grove-tree-${i}`;
+      slot.appendChild(art);
+      scene.appendChild(slot);
     });
 
-    positions.forEach(p => {
-      const el = document.createElement("div");
-      el.className = "backdrop-tree";
-      el.title = `Tree #${p.harvest.harvestNumber} — ${p.harvest.pointsAtHarvest} pts`;
-      el.style.cssText = `
-        ${p.side < 0 ? "right" : "left"}: calc(50% + ${p.offset}px);
-        transform: scale(${p.scale});
-        z-index: ${p.zIndex};
-        animation-delay: ${p.index * 0.12}s;
-      `;
-
-      const treeBox = document.createElement("div");
-      treeBox.className = "backdrop-tree-inner";
-      treeBox.id = `backdrop-tree-${p.index}`;
-      el.appendChild(treeBox);
-
-      const label = document.createElement("span");
-      label.className = "backdrop-tree-label";
-      label.textContent = `#${p.harvest.harvestNumber}`;
-      el.appendChild(label);
-
-      $gardenBackdrop.appendChild(el);
+    // Cosmetics earned from harvests, standing along the front of the grove
+    const props = cosmetics.slice(0, 5);
+    props.forEach((c, i) => {
+      if (!window.Art || !window.Art.hasCritter(c.type)) return;
+      const x = 10 + ((i + 0.5) / props.length) * 80;
+      const prop = document.createElement("div");
+      prop.className = "grove-prop";
+      prop.dataset.rarity = c.rarity || "common";
+      prop.style.cssText = `left:${x.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
+      prop.title = `${c.label} (${c.rarity})`;
+      prop.innerHTML = window.Art.critter(c.type, 40);
+      scene.appendChild(prop);
     });
 
-    // Render procedural trees into each backdrop slot — same stage as main tree
-    const mainStage = data.stage ? data.stage.index : 13;
-    const mainProgress = data.stageProgress || 0.5;
+    if (hidden > 0) {
+      const more = document.createElement("span");
+      more.className = "grove-more";
+      more.textContent = `+${hidden} more`;
+      scene.appendChild(more);
+    }
+
     if (typeof window.AlmondTree !== "undefined") {
-      positions.forEach(p => {
-        const container = document.getElementById(`backdrop-tree-${p.index}`);
-        if (container) {
-          window.AlmondTree.render(container, mainStage, false, mainProgress);
-        }
-      });
-    }
-
-
-    // Show "+N more" if needed
-    if (forest.length > MAX_VISIBLE) {
-      const more = document.createElement("div");
-      more.className = "backdrop-more-badge";
-      more.textContent = `+${forest.length - MAX_VISIBLE} more`;
-      $gardenBackdrop.appendChild(more);
-    }
-
-    // ── Render critters at the bottom of the scene ──
-    if (cosmetics.length > 0) {
-      cosmetics.forEach((c, i) => {
-        const category = getCosmeticCategory(c.type);
-        const xPos = 10 + (i / cosmetics.length) * 70 + Math.random() * 12;
-        const delay = (i * 0.6) + Math.random() * 2;
-        const duration = 6 + Math.random() * 8;
-
-        const critter = document.createElement("div");
-        critter.className = `garden-critter ${category === "animal" ? "roaming" : category === "nature" ? "planted" : "structure"}`;
-        critter.dataset.rarity = c.rarity;
-        critter.title = `${c.label} (${c.rarity})`;
-        critter.style.cssText = `left:${xPos}%; animation-delay:${delay}s; --roam-duration:${duration}s`;
-
-        critter.innerHTML = `
-          <span class="critter-sprite ${category === "nature" ? "sway" : ""}">${c.icon}</span>
-          <span class="critter-label">${c.label}</span>
-        `;
-        $gardenCritters.appendChild(critter);
+      const maxStage = (window.AlmondTree.stages || []).length - 1;
+      shown.forEach((h, i) => {
+        const container = document.getElementById(`grove-tree-${i}`);
+        if (!container) return;
+        // fall back to the final stage — harvesting is only possible there
+        const stage = h.pointsAtHarvest ? stageIndexForPoints(h.pointsAtHarvest) : maxStage;
+        window.AlmondTree.render(container, stage, false, 1);
+        fitTreeToBox(container);
       });
     }
   }
@@ -369,6 +400,7 @@
     if (nature.includes(type)) return 'nature';
     return 'structure';
   }
+
 
 
 
@@ -416,9 +448,9 @@
 
   function showHarvestCelebration(result) {
     const cosmetic = result.cosmeticEarned;
-    $harvestEmoji.textContent       = "🌾";
+    $harvestEmoji.innerHTML         = window.Art ? window.Art.icon("harvest", 54) : "";
     $harvestSub.textContent         = `Tree #${result.harvestNumber} added to your forest!`;
-    $harvestCosmeticIcon.textContent  = cosmetic.icon;
+    $harvestCosmeticIcon.innerHTML  = window.Art ? window.Art.badge(cosmetic.type, 54) : "";
     $harvestCosmeticLabel.textContent = `You earned: ${cosmetic.label}!`;
     $harvestCosmeticRarity.textContent = cosmetic.rarity;
     $harvestCosmeticRarity.style.color = RARITY_COLORS[cosmetic.rarity] || "inherit";

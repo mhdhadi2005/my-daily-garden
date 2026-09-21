@@ -6,7 +6,7 @@
   <meta name="description" content="My Daily Garden — Grow your almond tree by engaging with the 10almonds newsletter">
   <title>My Daily Garden — 10almonds</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M11 22v-6h2v6z' fill='%236B4423'/><circle cx='12' cy='8' r='5' fill='%233E8E5A'/><circle cx='8' cy='12' r='4' fill='%23276B41'/><circle cx='16' cy='12' r='4' fill='%233E8E5A'/><circle cx='12' cy='12.6' r='4.3' fill='%23276B41'/></svg>">
 </head>
 <body>
 
@@ -30,15 +30,15 @@
       <p class="stage-description" id="stage-description"></p>
     </div>
 
-    <!-- Unified Garden Scene: main tree + harvested forest + critters -->
+    <!-- Unified Garden Scene: main tree (hero) + forest shelf of past harvests + critters -->
     <div class="garden-scene" id="garden-scene">
-      <!-- Harvested trees rendered behind/beside the main tree -->
-      <div class="garden-backdrop" id="garden-backdrop"></div>
-
-      <!-- Main growing tree (center) -->
+      <!-- Main growing tree (hero, always shown) -->
       <div class="tree-container" id="tree-container">
         <div class="loading-spinner"></div>
       </div>
+
+      <!-- Past harvests, shown as a smaller shelf below the hero tree -->
+      <div class="garden-backdrop" id="garden-backdrop"></div>
 
       <!-- Cosmetic critters roaming at the bottom -->
       <div class="garden-critters" id="garden-critters"></div>
@@ -47,7 +47,7 @@
     <!-- Harvest Button (only shown at max stage) -->
     <div class="harvest-section" id="harvest-section" style="display:none">
       <button class="harvest-btn" id="harvest-btn" aria-label="Harvest your fully grown tree">
-        🌾 Harvest Your Tree
+        Harvest Your Tree
       </button>
       <p class="harvest-hint">Your tree is fully grown! Harvest it to add it to your forest and start a new one.</p>
     </div>
@@ -55,15 +55,15 @@
     <!-- Harvest Celebration Overlay -->
     <div class="harvest-overlay" id="harvest-overlay" style="display:none" aria-hidden="true">
       <div class="harvest-celebration">
-        <div class="harvest-celebration-emoji" id="harvest-emoji">🌾</div>
+        <div class="harvest-celebration-emoji" id="harvest-emoji" data-icon="harvest" data-icon-size="54"></div>
         <h2 class="harvest-celebration-title">Tree Harvested!</h2>
         <p class="harvest-celebration-sub" id="harvest-sub">Your tree joins the forest…</p>
         <div class="harvest-cosmetic-reveal" id="harvest-cosmetic">
-          <span class="harvest-cosmetic-icon" id="harvest-cosmetic-icon">🦊</span>
+          <span class="harvest-cosmetic-icon" id="harvest-cosmetic-icon"></span>
           <span class="harvest-cosmetic-label" id="harvest-cosmetic-label">You earned a Fox!</span>
           <span class="harvest-cosmetic-rarity" id="harvest-cosmetic-rarity">common</span>
         </div>
-        <button class="harvest-continue-btn" id="harvest-continue">Continue Growing 🌱</button>
+        <button class="harvest-continue-btn" id="harvest-continue">Continue Growing</button>
       </div>
     </div>
 
@@ -91,32 +91,32 @@
 
     <div class="stats-grid">
       <div class="stat-card" id="stat-streak">
-        <span class="stat-icon">🔥</span>
+        <span class="stat-icon" data-icon="flame"></span>
         <div class="stat-value" id="streak-value">0</div>
         <div class="stat-label">Day Streak</div>
       </div>
       <div class="stat-card">
-        <span class="stat-icon">⭐</span>
+        <span class="stat-icon" data-icon="star"></span>
         <div class="stat-value" id="points-value">0</div>
         <div class="stat-label">Points</div>
       </div>
       <div class="stat-card">
-        <span class="stat-icon">🌲</span>
+        <span class="stat-icon" data-icon="tree"></span>
         <div class="stat-value" id="harvests-value">0</div>
         <div class="stat-label">Trees Grown</div>
       </div>
       <div class="stat-card">
-        <span class="stat-icon">📧</span>
+        <span class="stat-icon" data-icon="mail"></span>
         <div class="stat-value" id="opens-value">0</div>
         <div class="stat-label">Emails Opened</div>
       </div>
       <div class="stat-card">
-        <span class="stat-icon">🔗</span>
+        <span class="stat-icon" data-icon="link"></span>
         <div class="stat-value" id="clicks-value">0</div>
         <div class="stat-label">Links Clicked</div>
       </div>
       <div class="stat-card">
-        <span class="stat-icon">🏆</span>
+        <span class="stat-icon" data-icon="trophy"></span>
         <div class="stat-value" id="longest-value">0</div>
         <div class="stat-label">Best Streak</div>
       </div>
@@ -126,14 +126,16 @@
     <div class="points-guide-section" id="points-guide-section">
       <div class="points-guide-header">
         <div class="points-guide-title-wrap">
-          <span class="points-guide-title">🌱 How to Grow Your Garden</span>
+          <span class="points-guide-title">
+            <span class="title-icon" data-icon="sprout" data-icon-size="19"></span>How to Grow Your Garden
+          </span>
           <p class="points-guide-subtitle">Every action helps your almond tree blossom</p>
         </div>
         <span class="points-guide-badge">Points Guide</span>
       </div>
       <div class="points-guide-grid">
         <div class="point-guide-card">
-          <div class="point-guide-icon-bg">📧</div>
+          <div class="point-guide-icon-bg" data-icon="mail" data-icon-size="20"></div>
           <div class="point-guide-details">
             <div class="point-guide-action">Open Daily Newsletter</div>
             <div class="point-guide-note">Daily morning reading boost</div>
@@ -142,7 +144,7 @@
         </div>
 
         <div class="point-guide-card">
-          <div class="point-guide-icon-bg">🔗</div>
+          <div class="point-guide-icon-bg" data-icon="link" data-icon-size="20"></div>
           <div class="point-guide-details">
             <div class="point-guide-action">Click Article Links</div>
             <div class="point-guide-note">Read health insights (up to 5/day)</div>
@@ -150,17 +152,12 @@
           <div class="point-guide-pill" id="guide-pts-click">+10 pts</div>
         </div>
 
-        <div class="point-guide-card">
-          <div class="point-guide-icon-bg">🧠</div>
-          <div class="point-guide-details">
-            <div class="point-guide-action">Answer Daily Quiz</div>
-            <div class="point-guide-note">Correct health trivia answer</div>
-          </div>
-          <div class="point-guide-pill" id="guide-pts-quiz">+15 pts</div>
-        </div>
+        <!-- Quiz card intentionally omitted — no real daily quiz exists yet.
+             Backend support (recordQuizAnswer) is still there for whenever
+             quiz content actually ships. -->
 
         <div class="point-guide-card featured">
-          <div class="point-guide-icon-bg">🛍️</div>
+          <div class="point-guide-icon-bg" data-icon="bag" data-icon-size="20"></div>
           <div class="point-guide-details">
             <div class="point-guide-action">Shop / Product Purchase</div>
             <div class="point-guide-note">Bonus tree growth for store orders</div>
@@ -169,7 +166,7 @@
         </div>
 
         <div class="point-guide-card">
-          <div class="point-guide-icon-bg">🔥</div>
+          <div class="point-guide-icon-bg" data-icon="flame" data-icon-size="20"></div>
           <div class="point-guide-details">
             <div class="point-guide-action">Keep Daily Streak</div>
             <div class="point-guide-note">Consecutive days unlock rare drops</div>
@@ -183,7 +180,7 @@
 
     <div class="rewards-section" id="rewards-section">
       <div class="rewards-header">
-        <span class="rewards-title">🎁 Rewards Collected</span>
+        <span class="rewards-title"><span class="title-icon" data-icon="gift" data-icon-size="19"></span>Rewards Collected</span>
         <span class="rewards-count" id="rewards-count"></span>
       </div>
       <div class="rewards-grid" id="rewards-grid">
@@ -193,7 +190,7 @@
 
     <!-- Demo Stage Selector -->
     <div class="demo-controls" id="demo-controls">
-      <div class="demo-label">🎮 Demo — tap a stage to preview</div>
+      <div class="demo-label">Demo — tap a stage to preview</div>
       <div class="demo-forest-controls">
         <label class="demo-forest-label">Forest cycles:
           <input type="range" id="demo-harvests-slider" min="0" max="7" value="0" class="demo-slider">
@@ -209,6 +206,7 @@
     </footer>
   </div>
 
+  <script src="artwork.js"></script>
   <script src="tree-stages.js"></script>
   <script src="app.js"></script>
 </body>

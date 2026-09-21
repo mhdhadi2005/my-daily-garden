@@ -42,7 +42,11 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
   // Forest: completed harvests
   const totalHarvests = sub.total_harvests || 0;
   const harvests = db
-    .prepare("SELECT harvest_number, points_at_harvest, cosmetic_earned, harvested_at FROM harvests WHERE subscriber_id = ? ORDER BY harvest_number ASC")
+    .prepare(`SELECT harvest_number  AS harvestNumber,
+                     points_at_harvest AS pointsAtHarvest,
+                     cosmetic_earned AS cosmeticEarned,
+                     harvested_at    AS harvestedAt
+              FROM harvests WHERE subscriber_id = ? ORDER BY harvest_number ASC`)
     .all(sub.id);
 
   // Cosmetics inventory
