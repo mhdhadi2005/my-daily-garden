@@ -24,7 +24,15 @@ function verifyWpSignature(req) {
   const age = Math.abs(Date.now() / 1000 - Number(timestamp));
   if (age > MAX_REQUEST_AGE_SECONDS) return false; // stale/replayed request
 
-  const payload = `${timestamp}:${JSON.stringify(req.body || {})}`;
+  // Sign the raw bytes WordPress actually sent, not a re-serialisation of the
+  // parsed body: PHP's wp_json_encode and JS's JSON.stringify agree on today's
+  // one-key payload, but they don't have to agree on key order, number
+  // formatting or unicode escaping, and any drift there is a 401 that looks
+  // like a wrong secret.
+  const raw = req.rawBody ? req.rawBody.toString("utf8") : null;
+  if (!raw) return false;
+
+  const payload = `${timestamp}:${raw}`;
   const expected = crypto.createHmac("sha256", SHARED_SECRET).update(payload).digest("hex");
 
   try {

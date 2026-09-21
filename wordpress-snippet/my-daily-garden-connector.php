@@ -12,7 +12,7 @@
  * it like a password, don't commit it to a public repo).
  */
 
-define('MDG_APP_URL', 'https://REPLACE-WITH-DEPLOYED-APP-URL.example.com');
+define('MDG_APP_URL', 'https://my-daily-garden-production.up.railway.app');
 define('MDG_SHARED_SECRET', 'REPLACE-WITH-A-LONG-RANDOM-SECRET');
 
 add_action('rest_api_init', function () {
@@ -84,9 +84,13 @@ add_shortcode('my_daily_garden_tree', function () {
     <script>
     (function () {
         var root = document.getElementById('mdg-tree-root');
+        // typeof guard, not a truthiness check: wpApiSettings is an undeclared
+        // global if the localize script didn't run, and touching it directly
+        // throws a ReferenceError that kills the whole fetch.
+        var nonce = (typeof wpApiSettings !== 'undefined' && wpApiSettings.nonce) ? wpApiSettings.nonce : '';
         fetch(root.dataset.restUrl, {
             credentials: 'same-origin',
-            headers: { 'X-WP-Nonce': wpApiSettings ? wpApiSettings.nonce : '' }
+            headers: { 'X-WP-Nonce': nonce }
         })
             .then(function (r) { return r.json(); })
             .then(function (data) {

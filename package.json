@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node src/smoke-test.js",
-    "verify:beehiiv": "node src/verify-beehiiv.js"
+    "verify:beehiiv": "node src/verify-beehiiv.js",
+    "verify:wp": "node src/verify-wp-connector.js"
   },
   "keywords": [],
   "author": "",
