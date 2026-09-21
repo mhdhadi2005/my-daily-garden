@@ -11,6 +11,16 @@ const path = require("path");
 // doesn't need to change.
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "../../data/garden.db");
 
+// On Railway (and most container hosts) the filesystem is ephemeral unless
+// DB_PATH points into an attached persistent Volume — otherwise every
+// redeploy/restart silently wipes all subscriber points/streaks/harvests.
+if (process.env.NODE_ENV === "production" && !process.env.DB_PATH) {
+  console.warn(
+    "WARNING: DB_PATH is not set in production — SQLite data will be lost on the next " +
+    "deploy/restart unless a persistent Volume is mounted and DB_PATH points into it."
+  );
+}
+
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const sqliteDb = new DatabaseSync(DB_PATH);
 sqliteDb.exec("PRAGMA journal_mode = WAL");

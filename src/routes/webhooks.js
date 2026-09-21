@@ -63,8 +63,28 @@ router.post("/api/seed-subscriber", (req, res) => {
   res.json({ ok: true, result });
 });
 
+// WooCommerce signs webhook payloads with the secret set on the webhook
+// itself (WooCommerce → Settings → Advanced → Webhooks), sent as a
+// base64 HMAC-SHA256 of the raw body in the X-WC-Webhook-Signature header.
+// Without this check anyone who finds the URL could award themselves
+// unlimited purchase points for free.
+function verifyWooSignature(req) {
+  const secret = process.env.WC_WEBHOOK_SECRET;
+  if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
+  const signature = req.headers["x-wc-webhook-signature"];
+  if (!signature || !req.rawBody) return false;
+  const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("base64");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch {
+    return false; // signature was malformed — reject, don't throw
+  }
+}
+
 // POST /webhooks/purchase — WooCommerce / store purchase webhook
 router.post("/webhooks/purchase", (req, res) => {
+  if (!verifyWooSignature(req)) return res.status(401).json({ error: "invalid signature" });
+
   const { subscriber_id, email, order_id, total, amount } = req.body || {};
   if (!subscriber_id && !email) {
     return res.status(400).json({ error: "missing subscriber_id or email" });
