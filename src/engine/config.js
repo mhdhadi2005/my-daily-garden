@@ -23,12 +23,14 @@ const DAILY_CLICK_CAP = 5;        // clicks beyond this in one day don't earn po
 const OPEN_BONUS_POINTS = 2;      // opens contribute a small bonus, never drive streak/growth
 const QUIZ_CORRECT_BONUS = 15;
 const PURCHASE_BONUS_POINTS = 20; // bonus points for purchasing a product
+const REFERRAL_BONUS_POINTS = 50; // per confirmed referral via the subscriber's beehiiv referral link
 
 const POINT_VALUES = {
   click: POINTS_PER_CLICK,
   open: OPEN_BONUS_POINTS,
   quiz: QUIZ_CORRECT_BONUS,
   purchase: PURCHASE_BONUS_POINTS,
+  referral: REFERRAL_BONUS_POINTS,
   dailyClickCap: DAILY_CLICK_CAP,
 };
 
@@ -122,6 +124,7 @@ module.exports = {
   OPEN_BONUS_POINTS,
   QUIZ_CORRECT_BONUS,
   PURCHASE_BONUS_POINTS,
+  REFERRAL_BONUS_POINTS,
   POINT_VALUES,
   REWARD_TABLE,
   COSMETICS,

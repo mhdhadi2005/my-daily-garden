@@ -1,6 +1,7 @@
 const { db } = require("../db");
 const {
   POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS, PURCHASE_BONUS_POINTS,
+  REFERRAL_BONUS_POINTS,
   stageForPoints, STAGES, rollReward, todayStr, daysBetween,
 } = require("./config");
 
@@ -171,11 +172,56 @@ function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
   };
 }
 
+/**
+ * Credits any referrals this subscriber has made that we haven't paid for yet.
+ *
+ * `totalReferrals` is the live count from beehiiv. We store how many we've
+ * already credited, so only the difference earns points — this is safe to run
+ * as often as you like, and re-running it right away is a no-op.
+ *
+ * Referrals never decrease someone's points: if the count drops (an unsubscribe
+ * turning a referral inactive), already-awarded points stay awarded.
+ */
+function creditReferrals({ subscriber, totalReferrals }) {
+  const alreadyCredited = subscriber.referrals_credited || 0;
+  const newReferrals = totalReferrals - alreadyCredited;
+
+  if (newReferrals <= 0) {
+    return { subscriber, pointsAwarded: 0, newReferrals: 0, stageChanged: false };
+  }
+
+  const prevStage = stageForPoints(subscriber.points);
+  const pointsAwarded = newReferrals * REFERRAL_BONUS_POINTS;
+  const newPoints = subscriber.points + pointsAwarded;
+  const newStage = stageForPoints(newPoints);
+
+  for (let n = alreadyCredited + 1; n <= totalReferrals; n++) {
+    db.prepare(
+      "INSERT INTO referral_log (subscriber_id, referral_number, points_awarded) VALUES (?, ?, ?)"
+    ).run(subscriber.id, n, REFERRAL_BONUS_POINTS);
+  }
+
+  db.prepare("UPDATE subscribers SET points = ?, referrals_credited = ? WHERE id = ?")
+    .run(newPoints, totalReferrals, subscriber.id);
+
+  const updatedSub = { ...subscriber, points: newPoints, referrals_credited: totalReferrals };
+  syncInBackground(updatedSub, newStage);
+
+  return {
+    subscriber: updatedSub,
+    pointsAwarded,
+    newReferrals,
+    stageChanged: newStage > prevStage,
+    newStage,
+  };
+}
+
 module.exports = {
   getOrCreateSubscriber,
   recordClick,
   recordOpen,
   recordQuizAnswer,
   recordPurchase,
+  creditReferrals,
 };
 

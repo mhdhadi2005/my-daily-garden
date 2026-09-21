@@ -7,6 +7,7 @@ const treeRoutes    = require("./routes/tree");
 const harvestRoutes = require("./routes/harvest");
 const wpAuthRoutes  = require("./routes/wp-auth");
 const demoRoutes    = require("./routes/demo");
+const jobRoutes     = require("./routes/jobs");
 
 initSchema();
 
@@ -24,6 +25,7 @@ app.use(treeRoutes);
 app.use(harvestRoutes);
 app.use(wpAuthRoutes);
 app.use(demoRoutes);
+app.use(jobRoutes);
 
 
 app.get("/health", (req, res) => res.json({ ok: true }));

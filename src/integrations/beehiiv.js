@@ -76,4 +76,38 @@ async function fetchClickTotal(beehiivSubscriberId) {
   return data?.data?.stats?.total_clicked ?? null;
 }
 
-module.exports = { syncSubscriberStats, fetchClickTotal };
+/**
+ * Counts how many people this subscriber has referred via their own beehiiv
+ * referral link.
+ *
+ * beehiiv has no "subscriber A referred subscriber B" webhook, and a new
+ * subscription's payload only carries its OWN referral_code (the one it can
+ * refer others with) — not who brought it in. The only way to attribute a
+ * referral is this reverse lookup: ask a subscription who IT referred. That's
+ * why crediting runs as a sweep (src/jobs/referrals.js) rather than a webhook.
+ *
+ * Only `active` referrals count. Pending double-opt-ins and invalid addresses
+ * are excluded on purpose, so points can't be farmed with throwaway emails.
+ */
+async function fetchReferralCount(beehiivSubscriberId) {
+  assertConfigured();
+  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${beehiivSubscriberId}?expand[]=referrals`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${API_KEY}` } });
+  if (!res.ok) {
+    throw new Error(`beehiiv referral fetch failed: ${res.status} ${res.statusText}`);
+  }
+  const data = await res.json();
+  const referrals = data?.data?.referrals;
+
+  // Distinguish "no referrals yet" (0) from "the API didn't return the field
+  // at all", which would silently look like zero and quietly credit nobody.
+  if (!Array.isArray(referrals)) {
+    throw new Error(
+      "beehiiv response had no `referrals` array — check that the expand[]=referrals " +
+      "parameter is still supported and the API key has referral access"
+    );
+  }
+  return referrals.filter((r) => r.status === "active").length;
+}
+
+module.exports = { syncSubscriberStats, fetchClickTotal, fetchReferralCount };

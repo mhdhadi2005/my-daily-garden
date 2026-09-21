@@ -33,9 +33,22 @@ const db = {
   exec: (sql) => sqliteDb.exec(sql),
 };
 
+// Columns added to existing tables after the first release. CREATE TABLE IF
+// NOT EXISTS won't add them to a database that already exists, so they need an
+// explicit ALTER that's safe to run on every boot.
+const ADDED_COLUMNS = [
+  ["subscribers", "referrals_credited", "INTEGER NOT NULL DEFAULT 0"],
+];
+
 function initSchema() {
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   db.exec(schema);
+
+  for (const [table, column, definition] of ADDED_COLUMNS) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    } catch (_) { /* already present */ }
+  }
 }
 
 module.exports = { db, initSchema };

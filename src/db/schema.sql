@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
   longest_streak      INTEGER NOT NULL DEFAULT 0,
   last_engaged_date   TEXT,                 -- 'YYYY-MM-DD', last day with >=1 qualifying click
   total_engaged_days   INTEGER NOT NULL DEFAULT 0,
+  referrals_credited  INTEGER NOT NULL DEFAULT 0, -- how many referrals we've already paid points for
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -44,6 +45,18 @@ CREATE TABLE IF NOT EXISTS reward_log (
   reward_type    TEXT NOT NULL,             -- butterfly | bird | rare_seed | golden_can | rainbow | legendary
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- One row per referral we've awarded points for. beehiiv has no "who referred
+-- whom" webhook, so the sweep job diffs each subscriber's referral count and
+-- credits the difference; this table is the audit trail of what was paid out.
+CREATE TABLE IF NOT EXISTS referral_log (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  subscriber_id     INTEGER NOT NULL REFERENCES subscribers(id),
+  referral_number   INTEGER NOT NULL,          -- their Nth referral
+  points_awarded    INTEGER NOT NULL,
+  credited_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_referral_log_subscriber ON referral_log(subscriber_id);
 
 CREATE TABLE IF NOT EXISTS reconciliation_log (
   id                    INTEGER PRIMARY KEY AUTOINCREMENT,
