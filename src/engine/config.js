@@ -22,14 +22,27 @@ const POINTS_PER_CLICK = 10;      // every qualifying click, equal weight
 const DAILY_CLICK_CAP = 5;        // clicks beyond this in one day don't earn points (set to Infinity to disable)
 const OPEN_BONUS_POINTS = 2;      // opens contribute a small bonus, never drive streak/growth
 const QUIZ_CORRECT_BONUS = 15;
-const PURCHASE_BONUS_POINTS = 20; // bonus points for purchasing a product
 const REFERRAL_BONUS_POINTS = 50; // per confirmed referral via the subscriber's beehiiv referral link
+
+// Purchase points scale with order value rather than a flat bonus — 1 point
+// per $1 spent, with a floor so a purchase is never worth almost nothing
+// (covers small orders, and orders where WooCommerce doesn't send a total).
+// This ratio is a placeholder: nobody has confirmed real order sizes yet, so
+// tune POINTS_PER_DOLLAR_SPENT once actual store data exists.
+const POINTS_PER_DOLLAR_SPENT = 1;
+const MIN_PURCHASE_POINTS = 10;
+
+function pointsForPurchase(amount) {
+  const spent = Number(amount);
+  if (!spent || spent <= 0) return MIN_PURCHASE_POINTS;
+  return Math.max(MIN_PURCHASE_POINTS, Math.round(spent * POINTS_PER_DOLLAR_SPENT));
+}
 
 const POINT_VALUES = {
   click: POINTS_PER_CLICK,
   open: OPEN_BONUS_POINTS,
   quiz: QUIZ_CORRECT_BONUS,
-  purchase: PURCHASE_BONUS_POINTS,
+  purchase: { perDollarSpent: POINTS_PER_DOLLAR_SPENT, minimum: MIN_PURCHASE_POINTS },
   referral: REFERRAL_BONUS_POINTS,
   dailyClickCap: DAILY_CLICK_CAP,
 };
@@ -123,13 +136,15 @@ module.exports = {
   DAILY_CLICK_CAP,
   OPEN_BONUS_POINTS,
   QUIZ_CORRECT_BONUS,
-  PURCHASE_BONUS_POINTS,
+  POINTS_PER_DOLLAR_SPENT,
+  MIN_PURCHASE_POINTS,
   REFERRAL_BONUS_POINTS,
   POINT_VALUES,
   REWARD_TABLE,
   COSMETICS,
   rollHarvestCosmetic,
   stageForPoints,
+  pointsForPurchase,
   rollReward,
   todayStr,
   daysBetween,

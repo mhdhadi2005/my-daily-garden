@@ -262,8 +262,8 @@
     if ($quiz && pointValues.quiz !== undefined) {
       $quiz.textContent = `+${pointValues.quiz} pts`;
     }
-    if ($purchase && pointValues.purchase !== undefined) {
-      $purchase.textContent = `+${pointValues.purchase} pts`;
+    if ($purchase && pointValues.purchase) {
+      $purchase.textContent = `+${pointValues.purchase.perDollarSpent} pt/$`;
     }
   }
 

@@ -1,8 +1,8 @@
 const { db } = require("../db");
 const {
-  POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS, PURCHASE_BONUS_POINTS,
+  POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS,
   REFERRAL_BONUS_POINTS,
-  stageForPoints, STAGES, rollReward, todayStr, daysBetween,
+  stageForPoints, pointsForPurchase, STAGES, rollReward, todayStr, daysBetween,
 } = require("./config");
 
 const { linkSubscriberIfPossible } = require("../integrations/woocommerce");
@@ -155,8 +155,9 @@ function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
     console.warn("Could not insert purchase_log:", err.message);
   }
 
+  const pointsAwarded = pointsForPurchase(amount);
   const prevStage = stageForPoints(sub.points);
-  const newPoints = sub.points + PURCHASE_BONUS_POINTS;
+  const newPoints = sub.points + pointsAwarded;
   const newStage = stageForPoints(newPoints);
 
   db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
@@ -166,7 +167,7 @@ function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
 
   return {
     subscriber: updatedSub,
-    pointsAwarded: PURCHASE_BONUS_POINTS,
+    pointsAwarded,
     stageChanged: newStage > prevStage,
     newStage,
   };
