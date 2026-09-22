@@ -471,7 +471,13 @@
       else {
         const heights =    [0, 0, 150, 200, 200, 200, 210, 220, 240, 250, 260, 270, 270, 280];
         const thicknesses = [0, 0,  15,  25,  25,  25,  28,  32,  50,  55,  58,  62,  62,  65];
-        const levels =     [0, 0,   2,   3,   4,   4,   4,   5,   6,   6,   6,   7,   7,   7];
+        // Branch depth — each +1 here multiplies node count by ~2.7x (the
+        // branching factor below), so this looks small but isn't. The old
+        // array went up to 7, which generated ~16,000 DOM nodes for a single
+        // tree at the top stages (measured) — with up to 9 of those drawn at
+        // once in the forest grove, that's 100,000+ nodes and a multi-second
+        // frozen tab. Capped at 5: same visual growth curve, ~10x fewer nodes.
+        const levels =     [0, 0,   2,   2,   3,   3,   3,   4,   4,   4,   5,   5,   5,   5];
         
         const h    = heights[stageIndex];
         const t    = thicknesses[stageIndex];
