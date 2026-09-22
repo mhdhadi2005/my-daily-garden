@@ -6,22 +6,30 @@ const { recordClick, recordOpen, recordQuizAnswer, recordPurchase } = require(".
 
 const router = express.Router();
 
-// beehiiv (like most providers) signs webhook payloads with a shared secret.
-// Verify this BEFORE trusting the body — otherwise anyone who finds the
-// endpoint URL could award themselves unlimited points.
-// The exact header name/signing scheme should be confirmed against beehiiv's
-// current webhook docs when the account is connected; this is a standard
-// HMAC-SHA256-over-raw-body check that's easy to adapt once confirmed.
+// Verify BEFORE trusting the body — otherwise anyone who finds the endpoint
+// URL could award themselves unlimited points.
+//
+// Confirmed against beehiiv's own "How to use webhooks in automations" docs:
+// the Send Webhook automation action has no HMAC/signing capability — its
+// only auth option is a fixed custom header you type in when you build the
+// automation. So this checks that header against our stored secret directly,
+// rather than verifying a computed signature (there isn't one to verify).
+// When setting up the automation's Send Webhook step, add a header named
+// X-MDG-Secret with this same value as BEEHIIV_WEBHOOK_SECRET.
 function verifySignature(req) {
   const secret = process.env.BEEHIIV_WEBHOOK_SECRET;
   if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
-  const signature = req.headers["x-beehiiv-signature"];
-  if (!signature || !req.rawBody) return false;
-  const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const provided = req.headers["x-mdg-secret"];
+  if (!provided) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(secret);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-// Fires from a beehiiv Automation with a Click Trigger on real article links.
+// Fires from a beehiiv Automation: a Segment ("Post <X> was Clicked") feeding
+// a Segment Action trigger, with a Send Webhook step pointed at this URL.
+// Needs rebuilding per newsletter issue — beehiiv has no "any post, ever"
+// version of this trigger, only "this specific post".
 router.post("/webhooks/beehiiv/click", (req, res) => {
   if (!verifySignature(req)) return res.status(401).json({ error: "invalid signature" });
 
@@ -38,7 +46,8 @@ router.post("/webhooks/beehiiv/click", (req, res) => {
   res.json({ ok: true, result });
 });
 
-// Fires from beehiiv's "Email Opened" automation trigger.
+// Same mechanism as the click webhook above, just built off a
+// "Post <X> was Opened" segment instead of "was Clicked".
 router.post("/webhooks/beehiiv/open", (req, res) => {
   if (!verifySignature(req)) return res.status(401).json({ error: "invalid signature" });
 
