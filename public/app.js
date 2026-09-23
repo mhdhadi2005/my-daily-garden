@@ -43,6 +43,14 @@
   let demoHarvests      = 0;
   let particleInterval  = null;
   let isRealMode        = false;
+  // Bumped at the start of every fetchAndRender call; a call only touches the
+  // DOM if it's still the most recent one by the time its work is ready to
+  // apply. Needed because the demo harvests slider fires a fresh
+  // fetchAndRender on every native "input" event — dozens per drag — with no
+  // guarantee an earlier request's fetch resolves before a later one's.
+  // Without this, dragging the slider could leave the page showing a stage
+  // the slider passed through mid-drag rather than where it was released.
+  let renderRequestId    = 0;
   let realSubscriberId  = null;
 
   // ── DOM Elements ──
@@ -126,8 +134,9 @@
 
   // ── Render Pipeline ──
   async function fetchAndRender(stageIndex) {
+    const requestId = ++renderRequestId;
     const data = await fetchTreeData(stageIndex);
-    if (!data) return;
+    if (!data || requestId !== renderRequestId) return; // superseded by a newer call while this one was in flight
     currentData = data;
 
     const newStage    = data.stage.index;
@@ -136,6 +145,7 @@
     if (shouldAnimate && currentStage >= 0) {
       $treeContainer.classList.add("fade-out");
       await sleep(300);
+      if (requestId !== renderRequestId) return;
     }
 
     renderTree(data, shouldAnimate);
@@ -154,6 +164,7 @@
       $treeContainer.classList.remove("fade-out");
       $treeContainer.classList.add("fade-in");
       await sleep(500);
+      if (requestId !== renderRequestId) return;
       $treeContainer.classList.remove("fade-in");
     }
 
@@ -518,10 +529,20 @@
 
   function setupDemoControls() {
     if (!$demoHarvestsSlider) return;
+    // Dragging fires "input" on every pixel of movement — far more often
+    // than there's any point re-fetching. Coalesce with a short timer rather
+    // than requestAnimationFrame: rAF is paused while the tab is hidden/
+    // backgrounded, which would silently stop the slider updating in that
+    // state; setTimeout keeps firing regardless of tab visibility.
+    let renderTimer = null;
     $demoHarvestsSlider.addEventListener("input", () => {
       demoHarvests = parseInt($demoHarvestsSlider.value, 10);
       $demoHarvestsCount.textContent = demoHarvests;
-      fetchAndRender(currentStage >= 0 ? currentStage : 0);
+      if (renderTimer) return;
+      renderTimer = setTimeout(() => {
+        renderTimer = null;
+        fetchAndRender(currentStage >= 0 ? currentStage : 0);
+      }, 16);
     });
   }
 
