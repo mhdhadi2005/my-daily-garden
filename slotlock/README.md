@@ -48,10 +48,21 @@ the slot was lost anyway, it's refunded automatically instead of double-booking.
 
 ## Deploy (Railway)
 
-1. New Railway service from this repo, **Root Directory = `slotlock`**.
-2. Add a Volume mounted at `/data` and set `DB_PATH=/data/slotlock.db`.
-3. Set `BASE_URL` to the public URL (custom domain once you have one).
-4. Run `npm run seed` once from the Railway shell if you want `/demo` live.
+1. New service from this GitHub repo. In **Settings → Source**, set
+   **Root Directory = `slotlock`** and pick the branch to deploy.
+2. In **Settings → Config-as-code**, set the config file path to
+   `/slotlock/railway.json` (Railway doesn't look inside the root directory for it).
+3. Attach a **Volume** mounted at `/data`.
+4. **Settings → Networking → Generate Domain** to get a `*.up.railway.app` URL.
+5. Variables:
+   - `NODE_ENV=production`
+   - `DB_PATH=/data/slotlock.db`
+   - `BASE_URL=https://<your-domain>` (no trailing slash)
+   - `SEED_DEMO=1` (creates the `/demo` example page on first boot)
+6. Check `https://<your-domain>/health` returns `{"ok":true}`.
+
+Without Stripe keys the live site runs in demo mode (nothing charges). Add the
+Stripe variables below before inviting real artists.
 
 ## Turn on real payments (Stripe)
 

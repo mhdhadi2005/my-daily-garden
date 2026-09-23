@@ -4,6 +4,7 @@ const path = require("path");
 const { initSchema } = require("./db");
 
 initSchema();
+if (process.env.SEED_DEMO === "1") require("./seed-demo").ensureDemo();
 
 const auth = require("./lib/auth");
 const { router: authRoutes } = require("./routes/auth");
