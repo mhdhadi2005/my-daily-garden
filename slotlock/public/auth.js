@@ -1,7 +1,7 @@
 const isSignup = location.pathname === "/signup";
 const form = document.getElementById(isSignup ? "signup" : "login");
 form.classList.remove("hidden");
-document.title = isSignup ? "Sign up · Inkbook" : "Log in · Inkbook";
+document.title = isSignup ? "Sign up · Slotlock" : "Log in · Slotlock";
 
 // Already logged in? Straight to the dashboard.
 api("/api/me").then(() => location.replace("/app")).catch(() => {});

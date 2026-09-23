@@ -8,13 +8,13 @@ const { billingState, depositsReady, baseUrl, rateLimit, str, isEmail } = requir
 const router = express.Router();
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30 });
 
-// Handles live at the site root (inkbook.app/sarahink), so anything that is or
+// Handles live at the site root (slotlock.com/sarahink), so anything that is or
 // could become a real route is off limits.
 const RESERVED = new Set([
   "api", "app", "admin", "login", "logout", "signup", "register", "booking", "bookings",
   "book", "demo-pay", "webhooks", "health", "static", "assets", "public", "pricing",
   "about", "terms", "privacy", "help", "support", "blog", "settings", "dashboard",
-  "inkbook", "www", "mail", "stripe", "billing",
+  "slotlock", "www", "mail", "stripe", "billing",
 ]);
 
 function validHandle(h) {

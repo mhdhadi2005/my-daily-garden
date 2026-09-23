@@ -16,7 +16,7 @@ async function sendEmail({ to, subject, text }) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || "Inkbook <onboarding@resend.dev>",
+        from: process.env.EMAIL_FROM || "Slotlock <onboarding@resend.dev>",
         to: [to], subject, text,
       }),
     });

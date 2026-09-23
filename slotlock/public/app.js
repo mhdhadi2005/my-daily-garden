@@ -341,7 +341,7 @@ function renderBilling() {
     new URLSearchParams(location.search).get("billing") === "success"
       ? h("div.notice.ok", { style: "margin-bottom:1rem" }, "Thanks! You're subscribed.") : null,
     h("div.card.stack",
-      h("div.row", { style: "align-items:center;justify-content:space-between" }, h("h2", { style: "font-size:1.2rem;margin:0;flex:0 0 auto" }, "Inkbook Pro"), h("div", { style: "flex:0 0 auto" }, status)),
+      h("div.row", { style: "align-items:center;justify-content:space-between" }, h("h2", { style: "font-size:1.2rem;margin:0;flex:0 0 auto" }, "Slotlock Pro"), h("div", { style: "flex:0 0 auto" }, status)),
       h("div.price", "$19", h("small", " / month")),
       h("p.muted", "Unlimited bookings. No per-booking fees from us. Cancel anytime from the billing portal."),
       b.subscribed

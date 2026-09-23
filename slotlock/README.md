@@ -1,4 +1,6 @@
-# Inkbook
+# Slotlock
+
+*Lock the slot. Take the deposit. End no-shows.*
 
 Booking pages with deposits for tattoo artists (and stylists, nail and lash
 techs: anyone who books by appointment and gets burned by no-shows).
@@ -11,12 +13,12 @@ artist keeps it.
 
 **Business model:** $19/month per artist after a 14-day free trial (no card
 needed to start). Deposits go straight to the artist's own Stripe account, and
-Inkbook takes no cut. 53 paying artists ≈ $1,000/month. See `LAUNCH.md` for the plan to get there.
+Slotlock takes no cut. 53 paying artists ≈ $1,000/month. See `LAUNCH.md` for the plan to get there.
 
 ## Run it locally
 
 ```bash
-cd inkbook
+cd slotlock
 npm install
 npm run seed      # optional: creates the example page at /demo
 npm start         # http://localhost:3002
@@ -46,8 +48,8 @@ the slot was lost anyway, it's refunded automatically instead of double-booking.
 
 ## Deploy (Railway)
 
-1. New Railway service from this repo, **Root Directory = `inkbook`**.
-2. Add a Volume mounted at `/data` and set `DB_PATH=/data/inkbook.db`.
+1. New Railway service from this repo, **Root Directory = `slotlock`**.
+2. Add a Volume mounted at `/data` and set `DB_PATH=/data/slotlock.db`.
 3. Set `BASE_URL` to the public URL (custom domain once you have one).
 4. Run `npm run seed` once from the Railway shell if you want `/demo` live.
 
@@ -57,7 +59,7 @@ the slot was lost anyway, it's refunded automatically instead of double-booking.
    started, choose "Express" accounts). Deposits are destination charges, so the
    artist's connected account needs to be in the same region as your platform
    account (e.g. US platform → US artists).
-2. Create a Product "Inkbook Pro" with a recurring **$19/month** Price. Put the
+2. Create a Product "Slotlock Pro" with a recurring **$19/month** Price. Put the
    price ID in `STRIPE_PRICE_ID`.
 3. Add a webhook endpoint at `{BASE_URL}/webhooks/stripe` with events
    `checkout.session.completed`, `checkout.session.expired`,

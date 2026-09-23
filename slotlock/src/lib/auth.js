@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { db } = require("../db");
 
-const COOKIE = "ib_session";
+const COOKIE = "sl_session";
 const SESSION_DAYS = 30;
 
 function hashPassword(password) {

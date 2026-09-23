@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
-// Minimal Stripe client over fetch — the handful of endpoints Inkbook uses
+// Minimal Stripe client over fetch — the handful of endpoints Slotlock uses
 // doesn't justify the SDK. With no STRIPE_SECRET_KEY the app runs in demo
 // mode and none of these are called.
 

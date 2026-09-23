@@ -71,7 +71,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3002;
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`Inkbook listening on :${PORT}`));
+  app.listen(PORT, () => console.log(`Slotlock listening on :${PORT}`));
   startScheduler();
 }
 

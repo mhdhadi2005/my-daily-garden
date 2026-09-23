@@ -226,8 +226,8 @@ router.get("/api/public/bookings/:token/ics", (req, res) => {
   const fmt = (iso) => iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const esc = (s) => String(s).replace(/[\;,]/g, (c) => `\\${c}`).replace(/\r?\n/g, "\\n");
   const ics = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Inkbook//EN", "BEGIN:VEVENT",
-    `UID:${b.public_token}@inkbook`, `DTSTAMP:${fmt(new Date().toISOString())}`,
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Slotlock//EN", "BEGIN:VEVENT",
+    `UID:${b.public_token}@slotlock`, `DTSTAMP:${fmt(new Date().toISOString())}`,
     `DTSTART:${fmt(b.starts_at)}`, `DTEND:${fmt(b.ends_at)}`,
     `SUMMARY:${esc(`${b.service_name} with ${a.display_name}`)}`,
     `LOCATION:${esc(a.location)}`,

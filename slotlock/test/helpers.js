@@ -3,7 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inkbook-test-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "slotlock-test-"));
 process.env.DB_PATH = path.join(dir, "test.db");
 process.env.NODE_ENV = "test";
 process.env.DISABLE_SCHEDULER = "1";

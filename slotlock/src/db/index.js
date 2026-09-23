@@ -9,7 +9,7 @@ const path = require("path");
 // the INSERT in routes/public.js run in the same tick with no await between
 // them, so two requests can't both claim a slot. If this moves to Postgres,
 // that check needs a transaction or an exclusion constraint instead.
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "../../data/inkbook.db");
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, "../../data/slotlock.db");
 
 if (process.env.NODE_ENV === "production" && !process.env.DB_PATH) {
   console.warn(

@@ -59,7 +59,7 @@ router.post("/api/stripe/connect/sync", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- Billing: the artist's own subscription to Inkbook ---------------------
+// ---- Billing: the artist's own subscription to Slotlock ---------------------
 
 router.post("/api/billing/checkout", requireAuth, async (req, res) => {
   const a = req.artist;

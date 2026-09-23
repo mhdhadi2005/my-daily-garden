@@ -1,12 +1,15 @@
-# Launch plan: first $1,000/month
+# Slotlock launch plan: first $1,000/month
+
+*Lock the slot. Take the deposit. End no-shows.*
 
 **Target:** 53 artists × $19 = $1,007 MRR. Realistic in 3–6 months with steady
 outreach. This is a sales job more than a code job now: the product is built.
 
 ## Week 0: get it live (1–2 days)
 
-- [ ] Pick a name and buy a `.com` (Inkbook is a working name. Check it's free,
-      or use something like `deposit.ink` or `bookedink.com`).
+- [ ] Buy the domain on GoDaddy: `slotlock.com`, else `getslotlock.com`, else
+      `slotlock.app`. Skip the add-ons (email, site builder, SSL); Railway
+      provides SSL free. Grab the `@slotlock` Instagram handle too.
 - [ ] Deploy on Railway (README → Deploy). Point the domain at it.
 - [ ] Stripe: test mode first, do one full booking with a test card
       (4242 4242 4242 4242), then switch to live keys.
@@ -66,7 +69,7 @@ in their bio. Remove every bit of friction.
 - **Content:** short Reels/TikToks: "How I stopped losing $300 to no-shows",
   screen recordings of a client booking in 30 seconds, before/after of a DM
   inbox. Post from the product account, and ask founding artists to share.
-- **"Booking by Inkbook"** is on every client-facing page. Each booking page is
+- **"Booking by Slotlock"** is on every client-facing page. Each booking page is
   an ad seen by other people who get tattooed, some of whom are artists.
 - **Communities:** r/tattooartists and artist Facebook groups. Answer questions
   about deposits and no-shows helpfully first, and mention the tool only when relevant.

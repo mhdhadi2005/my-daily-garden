@@ -1,5 +1,5 @@
 {
-  "name": "inkbook",
+  "name": "slotlock",
   "version": "0.1.0",
   "description": "Booking pages with deposits for tattoo artists and stylists",
   "main": "src/server.js",

@@ -94,6 +94,7 @@ input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 
 /* --- Landing ------------------------------------------------------------- */
 .hero { padding: 56px 0 40px; }
+.eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .02em; margin-bottom: .8rem; }
 .hero h1 { font-size: clamp(2.2rem, 6vw, 3.8rem); max-width: 14ch; }
 .hero p.lead { font-size: 1.2rem; color: var(--muted); max-width: 36rem; }
 .hero .row { max-width: 420px; margin-top: 1.5rem; }

@@ -15,7 +15,7 @@ const { lastInsertRowid: id } = db.prepare(`
     timezone, policy, trial_ends_at, subscription_status, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
 `).run(
-  "demo@inkbook.invalid", hashPassword(randomToken()), HANDLE, "Rosa Vega Tattoo",
+  "demo@slotlock.invalid", hashPassword(randomToken()), HANDLE, "Rosa Vega Tattoo",
   "Fine line, botanical and blackwork. Custom pieces and flash. Located in the Mission.",
   "Needle & Rose Studio, 2280 Mission St, San Francisco", "rosavega.tattoo",
   "America/Los_Angeles",
