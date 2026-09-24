@@ -631,8 +631,33 @@ body {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   font-weight: 500;
+}
+
+.demo-control-block {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.demo-control-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.demo-control-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.demo-control-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
 }
 
 .stage-selector {

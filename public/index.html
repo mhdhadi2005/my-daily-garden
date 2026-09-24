@@ -190,14 +190,24 @@
 
     <!-- Demo Stage Selector -->
     <div class="demo-controls" id="demo-controls">
-      <div class="demo-label">Demo — tap a stage to preview</div>
-      <div class="demo-forest-controls">
-        <label class="demo-forest-label">Forest cycles:
-          <input type="range" id="demo-harvests-slider" min="0" max="7" value="0" class="demo-slider">
-          <span id="demo-harvests-count">0</span>
-        </label>
+      <div class="demo-label">Demo preview — two separate settings below</div>
+
+      <div class="demo-control-block">
+        <div class="demo-control-title">1. Your current tree's stage</div>
+        <p class="demo-control-hint">Tap a stage to see the tree growing right now.</p>
+        <div class="stage-selector" id="stage-selector"></div>
       </div>
-      <div class="stage-selector" id="stage-selector"></div>
+
+      <div class="demo-control-block">
+        <div class="demo-control-title">2. Trees already harvested</div>
+        <p class="demo-control-hint">How many finished trees sit in your forest behind it.</p>
+        <div class="demo-forest-controls">
+          <label class="demo-forest-label">
+            <input type="range" id="demo-harvests-slider" min="0" max="7" value="0" class="demo-slider">
+            <span id="demo-harvests-count">0</span> harvested
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- Footer -->
