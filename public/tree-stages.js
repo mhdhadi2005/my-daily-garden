@@ -179,29 +179,34 @@
     }
   }
 
+  // A pointed leaf silhouette (two arcs meeting at a base point and a tip),
+  // not a plain ellipse blob. Same two-element cost as the shape it
+  // replaces (one filled shape + one vein line) — leaves are the most
+  // repeated element in the whole tree (hundreds at high stages), so this
+  // is the single highest-leverage shape to get right, and it can't afford
+  // to add per-leaf overhead like a gradient or extra shape would.
   function drawLeaf(svg, x, y, size, color, rotation) {
     const group = createSVGElement('g', {
       class: "tree-leaf",
       style: `transform-origin: ${x}px ${y}px; animation-delay: ${randomRange(0, 2)}s`
     });
-    
-    group.appendChild(createSVGElement('ellipse', {
-      cx: x + size,
-      cy: y,
-      rx: size,
-      ry: size * 0.4,
+
+    const tipX = x + size;
+    const bow = size * 0.34;
+    group.appendChild(createSVGElement('path', {
+      d: `M ${x} ${y} Q ${x + size * 0.32} ${y - bow} ${tipX} ${y} Q ${x + size * 0.32} ${y + bow} ${x} ${y} Z`,
       fill: color,
       transform: `rotate(${rotation}, ${x}, ${y})`
     }));
-    
-    group.appendChild(createSVGElement('line', {
-      x1: x, y1: y,
-      x2: x + size * 1.8, y2: y,
-      stroke: "rgba(255,255,255,0.3)",
-      "stroke-width": 0.5,
+
+    group.appendChild(createSVGElement('path', {
+      d: `M ${x} ${y} Q ${x + size * 0.5} ${y} ${tipX} ${y}`,
+      stroke: "rgba(255,255,255,0.35)",
+      "stroke-width": Math.max(0.5, size * 0.05),
+      fill: "none",
       transform: `rotate(${rotation}, ${x}, ${y})`
     }));
-    
+
     svg.appendChild(group);
   }
 
@@ -211,7 +216,7 @@
       style: `transform-origin: ${x}px ${y}px; animation-delay: ${randomRange(0, 2)}s`
     });
     
-    const colors = ["#F2A6B6", "#FADADD", "#FFF0F3"];
+    const colors = ["#F2A49B", "#FADADD", "#FFF0F3"];
     const petals = Math.floor(randomRange(4, 6));
     
     for (let i = 0; i < petals; i++) {
@@ -260,7 +265,7 @@
     const endY = y + Math.sin(angle) * length;
     
     if (level > 0) {
-      const color = stageIndex >= 7 ? "#704214" : "#6B4226";
+      const color = stageIndex >= 7 ? "#4A2E19" : "#6B4423";
       const controlX = x + Math.cos(angle - 0.2) * (length * 0.5);
       const controlY = y + Math.sin(angle - 0.2) * (length * 0.5);
       
@@ -290,8 +295,8 @@
   }
 
   function drawFoliage(svg, x, y, angle, stageIndex) {
-    const leafColorBase = stageIndex >= 7 ? "#D4A017" : (stageIndex >= 6 ? "#8F974A" : "#4A7A25");
-    const leafColor2 = stageIndex >= 7 ? "#B8860B" : "#2D5016";
+    const leafColorBase = stageIndex >= 7 ? "#D4A017" : (stageIndex >= 6 ? "#8F974A" : "#3E8E5A");
+    const leafColor2 = stageIndex >= 7 ? "#B8860B" : "#13612E";
     const colors = [leafColorBase, leafColor2];
     if (stageIndex === 6) colors.push("#D4A017");
     if (stageIndex === 4) colors.push("#6B8E4E");
@@ -329,7 +334,7 @@
       if (random() > 0.3) {
         for(let i = 0; i < Math.floor(randomRange(3, 6)); i++) {
           svg.appendChild(createSVGElement('circle', {
-            cx: x + randomRange(-10, 10), cy: y + randomRange(-10, 10), r: randomRange(1, 2), fill: "#F2A6B6"
+            cx: x + randomRange(-10, 10), cy: y + randomRange(-10, 10), r: randomRange(1, 2), fill: "#F2A49B"
           }));
         }
       }
@@ -337,20 +342,20 @@
 
     if (stageIndex === 4 && random() > 0.2) {
       if (currentProgress >= 0.7 && random() > 0.5) {
-        drawAlmond(svg, x + randomRange(-8, 8), y + randomRange(-8, 8), randomRange(2, 4), "#7BA05B");
+        drawAlmond(svg, x + randomRange(-8, 8), y + randomRange(-8, 8), randomRange(2, 4), "#3E8E5A");
       } else {
         drawBlossom(svg, x + randomRange(-8, 8), y + randomRange(-8, 8), randomRange(4, 7));
       }
     }
 
     if (stageIndex === 5 && random() > 0.4) {
-      let aColor = "#7BA05B";
+      let aColor = "#3E8E5A";
       if (currentProgress >= 0.7 && random() > 0.6) aColor = "#A4A848";
       drawAlmond(svg, x + randomRange(-5, 5), y + randomRange(0, 5), randomRange(6, 9), aColor);
     }
 
     if (stageIndex === 6 && random() > 0.4) {
-      let aColor = random() > 0.5 ? "#7BA05B" : "#DAA520";
+      let aColor = random() > 0.5 ? "#3E8E5A" : "#DAA520";
       if (currentProgress >= 0.7 && random() > 0.3) aColor = "#DAA520";
       drawAlmond(svg, x + randomRange(-5, 5), y + randomRange(0, 5), randomRange(6, 9), aColor);
     }
@@ -443,29 +448,29 @@
           cx: 200, cy: 510, rx: 10, ry: 15, fill: "#8B5A2B", transform: "rotate(15, 200, 510)"
         }));
         treeGroup.appendChild(createSVGElement('path', {
-          d: "M 200 495 Q 205 480 195 470", stroke: "#7BA05B", fill: "none", "stroke-width": 2
+          d: "M 200 495 Q 205 480 195 470", stroke: "#3E8E5A", fill: "none", "stroke-width": 2
         }));
-        drawLeaf(treeGroup, 195, 470, 5, "#7BA05B", -45);
-        drawLeaf(treeGroup, 197, 475, 4, "#7BA05B", 20);
+        drawLeaf(treeGroup, 195, 470, 5, "#3E8E5A", -45);
+        drawLeaf(treeGroup, 197, 475, 4, "#3E8E5A", 20);
         
         if (currentProgress >= 0.7) {
-          drawLeaf(treeGroup, 200, 482, 3, "#7BA05B", 45);
+          drawLeaf(treeGroup, 200, 482, 3, "#3E8E5A", 45);
           if (currentProgress >= 0.85) {
-             drawLeaf(treeGroup, 197, 488, 3, "#7BA05B", -30);
+             drawLeaf(treeGroup, 197, 488, 3, "#3E8E5A", -30);
           }
         }
       } 
       else if (stageIndex === 1) {
         const stemWidth = currentProgress >= 0.7 ? 5 : 4;
         treeGroup.appendChild(createSVGElement('path', {
-          d: "M 200 520 Q 195 460 205 420", stroke: "#6B4226", fill: "none", "stroke-width": stemWidth
+          d: "M 200 520 Q 195 460 205 420", stroke: "#6B4423", fill: "none", "stroke-width": stemWidth
         }));
-        drawLeaf(treeGroup, 202, 470, 8, "#4A7A25", -30);
-        drawLeaf(treeGroup, 198, 440, 8, "#4A7A25", 210);
-        drawLeaf(treeGroup, 205, 420, 10, "#4A7A25", -10);
+        drawLeaf(treeGroup, 202, 470, 8, "#3E8E5A", -30);
+        drawLeaf(treeGroup, 198, 440, 8, "#3E8E5A", 210);
+        drawLeaf(treeGroup, 205, 420, 10, "#3E8E5A", -10);
         
         if (currentProgress >= 0.7) {
-          drawLeaf(treeGroup, 196, 455, 7, "#4A7A25", 160);
+          drawLeaf(treeGroup, 196, 455, 7, "#3E8E5A", 160);
         }
       }
       else {
@@ -483,7 +488,7 @@
         const t    = thicknesses[stageIndex];
         const maxL = levels[stageIndex];
         
-        drawTrunk(treeGroup, h, t, stageIndex >= 7 ? "#5C3A21" : "#6B4226", stageIndex);
+        drawTrunk(treeGroup, h, t, stageIndex >= 7 ? "#4A2E19" : "#6B4423", stageIndex);
         buildTreeBranches(treeGroup, 200, 520 - h, -Math.PI / 2, h * 0.45, t * 0.6, 1, maxL, stageIndex);
 
         if (stageIndex === 4) {
@@ -491,7 +496,7 @@
             const bx = randomRange(50, 350);
             const by = randomRange(50, 400);
             const g = createSVGElement('g', { class: "falling", style: `animation-delay: ${randomRange(0, 5)}s` });
-            g.appendChild(createSVGElement('circle', { cx: bx, cy: by, r: randomRange(2, 4), fill: "#F2A6B6" }));
+            g.appendChild(createSVGElement('circle', { cx: bx, cy: by, r: randomRange(2, 4), fill: "#F2A49B" }));
             treeGroup.appendChild(g);
           }
         }
@@ -520,7 +525,7 @@
           for (let i = 0; i < numSparkles; i++) {
             let sColor = "#FFF8DC";
             if (stageIndex >= 13 && random() > 0.5) {
-                const sColors = ["#FFF8DC", "#FFD700", "#FFF3B0", "#F2A6B6", "#A8DEC7"];
+                const sColors = ["#FFF8DC", "#FFD700", "#FFF3B0", "#F2A49B", "#A8DEC7"];
                 sColor = sColors[Math.floor(randomRange(0, sColors.length))];
             }
             treeGroup.appendChild(createSVGElement('circle', {
@@ -588,16 +593,16 @@
             
             positions.forEach(sx => {
                 const h = saplingHeights * randomRange(0.8, 1.2);
-                drawTrunk(treeGroup, h, stageIndex >= 12 ? 8 : 4, "#6B4226", 2);
+                drawTrunk(treeGroup, h, stageIndex >= 12 ? 8 : 4, "#6B4423", 2);
                 if (stageIndex >= 12) {
                     buildTreeBranches(treeGroup, sx, 520 - h, -Math.PI / 2, h * 0.4, 4, 1, 2, stageIndex);
                     for(let k=0; k<3; k++) {
                         drawAlmond(treeGroup, sx + randomRange(-15, 15), 520 - h + randomRange(-10, 20), randomRange(4, 6), "#DAA520");
                     }
                 } else {
-                    drawLeaf(treeGroup, sx, 520 - h, 6, "#4A7A25", -30);
-                    drawLeaf(treeGroup, sx - 5, 520 - h + 10, 6, "#4A7A25", -150);
-                    drawLeaf(treeGroup, sx + 5, 520 - h + 5, 6, "#4A7A25", 20);
+                    drawLeaf(treeGroup, sx, 520 - h, 6, "#3E8E5A", -30);
+                    drawLeaf(treeGroup, sx - 5, 520 - h + 10, 6, "#3E8E5A", -150);
+                    drawLeaf(treeGroup, sx + 5, 520 - h + 5, 6, "#3E8E5A", 20);
                 }
             });
             

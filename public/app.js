@@ -300,20 +300,20 @@
   // progress grove trees use) and reading .getBBox() once per stage; rerun
   // that if the renderer's geometry changes. Zero measurement cost at runtime.
   const TREE_BOUNDS_BY_STAGE = [
-    { x: 87.5,  y: 459.2,  width: 225,   height: 90.8  },
-    { x: 87.5,  y: 408.3,  width: 225,   height: 141.7 },
-    { x: 87.5,  y: 228.4,  width: 225,   height: 321.6 },
-    { x: 87.5,  y: 125.4,  width: 225,   height: 424.6 },
+    { x: 87.5,  y: 463.7,  width: 225,   height: 86.3  },
+    { x: 87.5,  y: 412.5,  width: 225,   height: 137.5 },
+    { x: 87.5,  y: 242.3,  width: 225,   height: 307.7 },
+    { x: 87.5,  y: 138.6,  width: 225,   height: 411.4 },
     { x: 53.8,  y: 45.9,   width: 261.9, height: 504.1 },
-    { x: 87.5,  y: 54.4,   width: 245.1, height: 495.6 },
-    { x: 87.5,  y: 43.5,   width: 225,   height: 506.5 },
-    { x: 19,    y: 4.8,    width: 342,   height: 545.2 },
-    { x: -8.3,  y: -48.3,  width: 428.7, height: 598.3 },
-    { x: -19.5, y: -89.2,  width: 454.1, height: 639.2 },
-    { x: -88,   y: -176.1, width: 513.3, height: 726.1 },
-    { x: -48,   y: -149.5, width: 505.8, height: 699.5 },
-    { x: -43.3, y: -151.6, width: 488.6, height: 701.6 },
-    { x: -55.3, y: -156.7, width: 470,   height: 724.6 },
+    { x: 87.5,  y: 67.2,   width: 232.9, height: 482.8 },
+    { x: 87.5,  y: 57.3,   width: 225,   height: 492.7 },
+    { x: 19,    y: 14.8,   width: 342,   height: 535.2 },
+    { x: -8.3,  y: -35.9,  width: 415.1, height: 585.9 },
+    { x: -10.6, y: -73.5,  width: 445.2, height: 623.5 },
+    { x: -71.4, y: -159.5, width: 484.5, height: 709.5 },
+    { x: -35.4, y: -131.9, width: 475.8, height: 681.9 },
+    { x: -27.3, y: -134.3, width: 458.4, height: 684.3 },
+    { x: -37.4, y: -139.9, width: 445.9, height: 707.9 },
   ];
 
   function fitTreeToBox(container, stageIndex) {
