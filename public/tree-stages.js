@@ -456,7 +456,9 @@
       { name: "Enchanted Grove",     need: 1960, description: "A magical grove of almond trees bathed in eternal golden light.", particleType: "sparkles" }
     ],
 
-    render: function(containerElement, stageIndex, animate = true, progress = 0.5) {
+    // `variant` gives each forest tree its own shape. Without it every tree
+    // at the same stage was seeded identically — a row of exact clones.
+    render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0) {
       injectStyles();
       containerElement.innerHTML = '';
       currentProgress = progress;
@@ -467,7 +469,7 @@
         class: animate ? "tree-enter" : ""
       });
 
-      randomSeed = stageIndex * 1337 + 42;
+      randomSeed = stageIndex * 1337 + 42 + variant * 7919;
 
       if (stageIndex >= 7) {
         const defs = createSVGElement('defs');

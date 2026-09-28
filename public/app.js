@@ -398,45 +398,54 @@
     const shown  = forest.slice(-GROVE_MAX_TREES);
     const hidden = forest.length - shown.length;
     const n = shown.length + 1; // +1 for the current tree's own slot
+    const m = shown.length;
 
-    // Canopies need to actually overlap to read as one forest rather than a
-    // row of separate trees. Position by a FIXED overlap step (not spread
-    // across the full container width regardless of count) — spreading
-    // full-width was the bug in an earlier version of this: with only 2
-    // trees, "evenly across 0-100%" put them at opposite edges, further
-    // apart than ever despite being bigger. Instead: pick a natural tree
-    // size, pack trees at a constant overlap step, and only shrink the
-    // whole group if it would legitimately overflow the container (many
-    // trees) — then center the resulting group in the available width.
+    // One layered cluster, not a queue. Each harvested tree gets a depth
+    // row — front, middle or back (smaller, higher, hazier) — chosen so
+    // neighbours differ, plus a small size/position jitter from its harvest
+    // number, and they overlap heavily. With its own branch shape (the
+    // `variant` passed to render below) that reads as one continuous
+    // forest rather than a row of identical clones. The cluster is kept
+    // compact and centred (spreading trees across the full width was an
+    // earlier bug: two trees ended up at opposite edges) and only tightens
+    // when it would overflow. The current tree stands at its front edge.
     const containerWidth = $gardenBackdrop.clientWidth || 380;
-    const overlapFraction = 0.4; // each tree's leading edge sits this far into the previous one
-    let frontWidth = 100;
-    let step = frontWidth * (1 - overlapFraction);
-    let groupWidth = frontWidth + step * Math.max(0, n - 1);
-    const maxGroupWidth = containerWidth * 0.94;
-    if (groupWidth > maxGroupWidth) {
-      const scale = maxGroupWidth / groupWidth;
-      frontWidth *= scale;
-      step *= scale;
-      groupWidth = maxGroupWidth;
-    }
-    const backWidth = frontWidth * 0.72;
-    const startCenterPx = (containerWidth - groupWidth) / 2 + frontWidth / 2;
+    const DEPTHS = [
+      { cls: "is-front", scale: 1.0,  bottom: 8,  z: 3 },
+      { cls: "is-mid",   scale: 0.8,  bottom: 30, z: 2 },
+      { cls: "is-back",  scale: 0.62, bottom: 52, z: 1 },
+    ];
+    const DEPTH_PATTERN = [0, 2, 1, 2, 0, 1];
+    const CURRENT_GAP = 1.4; // the current tree stands a little apart, in front
 
-    const treeSlots = []; // {xPercent, topPx, heightPx} — reused below to anchor critters to a real tree
+    let frontWidth = 120;
+    let spacing = frontWidth * 0.5;
+    const units = Math.max(0, m - 1) + (m > 0 ? CURRENT_GAP : 0);
+    const maxSpan = containerWidth * 0.78;
+    if (spacing * units > maxSpan) {
+      const k = maxSpan / (spacing * units);
+      spacing *= k;
+      frontWidth = Math.max(60, frontWidth * Math.max(k, 0.55));
+    }
+    const groupStart = (containerWidth - spacing * units) / 2;
+
+    const treeSlots = []; // {xPercent, width, height, bottom} — reused below to anchor critters to a real tree
+    let sceneTop = 0; // tallest point above the ground, to size the scene
 
     shown.forEach((h, i) => {
-      const isBack = i % 2 === 1;
-      const centerPx = startCenterPx + step * i;
-      const x = (centerPx / containerWidth) * 100;
-      const width = isBack ? backWidth : frontWidth;
-      const height = width * 1.37;
       const num = h.harvestNumber || i + 1;
       const pts = h.pointsAtHarvest || 0;
+      const d = DEPTHS[DEPTH_PATTERN[i % DEPTH_PATTERN.length]];
+      const sizeJitter = 0.9 + ((num * 37) % 21) / 100;           // 0.90 – 1.10
+      const xJitter = (((num * 53) % 17) - 8) * (spacing / 60);    // a few px either way
+      const width = frontWidth * d.scale * sizeJitter;
+      const height = width * 1.37;
+      const centerPx = groupStart + spacing * i + xJitter;
+      const x = (centerPx / containerWidth) * 100;
 
       const slot = document.createElement("div");
-      slot.className = `grove-tree ${isBack ? "is-back" : "is-front"}`;
-      slot.style.cssText = `left:${x.toFixed(2)}%; width:${width.toFixed(0)}px; height:${height.toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
+      slot.className = `grove-tree ${d.cls}`;
+      slot.style.cssText = `left:${x.toFixed(2)}%; bottom:${d.bottom}px; z-index:${d.z}; width:${width.toFixed(0)}px; height:${height.toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
       slot.title = `Tree #${num} — harvested at ${pts} pts`;
 
       const art = document.createElement("div");
@@ -445,33 +454,18 @@
       slot.appendChild(art);
       scene.appendChild(slot);
 
-      treeSlots.push({ xPercent: x, width, height, isBack });
+      treeSlots.push({ xPercent: x, width, height, bottom: d.bottom });
+      sceneTop = Math.max(sceneTop, d.bottom + height);
     });
 
     // The current tree's slot — sized by its actual stage (a Seed reads as
-    // a thin new sprout, an Enchanted Grove tree dominates), not the
-    // uniform tile size past harvests use. Positioned at the group's next
-    // slot so it sits naturally beside its most recent predecessor, then
-    // clamped so its own (very variable) width never overflows the scene.
+    // a thin new sprout, an Enchanted Grove tree dominates), clamped so its
+    // (very variable) width never overflows the scene.
     const curStageIndex = data.stage.index;
-    const curScale  = currentTreeScale(curStageIndex);
-    const curWidth  = frontWidth * curScale;
+    const curWidth  = frontWidth * currentTreeScale(curStageIndex);
     const curBox    = TREE_BOUNDS_BY_STAGE[curStageIndex];
     const curHeight = curBox ? curWidth * (curBox.height / curBox.width) : curWidth * 1.37;
-
-    // Overlap with its immediate predecessor by real widths, not the
-    // uniform step — the current tree's width varies far more than a
-    // grove tile's (0.5x-1.8x), so re-using `step` as-is could leave a
-    // visible gap (undersized current tree) or excess overlap (oversized).
-    let curCenterPx;
-    if (shown.length > 0) {
-      const prevIsBack   = (shown.length - 1) % 2 === 1;
-      const prevWidth    = prevIsBack ? backWidth : frontWidth;
-      const prevCenterPx = startCenterPx + step * (shown.length - 1);
-      curCenterPx = prevCenterPx + (prevWidth / 2 + curWidth / 2) * (1 - overlapFraction);
-    } else {
-      curCenterPx = containerWidth / 2;
-    }
+    let curCenterPx = m > 0 ? groupStart + spacing * units : containerWidth / 2;
     curCenterPx = Math.max(curWidth / 2 + 4, Math.min(containerWidth - curWidth / 2 - 4, curCenterPx));
     const curX = (curCenterPx / containerWidth) * 100;
 
@@ -482,11 +476,10 @@
     scene.appendChild($treeContainer);
     fitTreeToBox($treeContainer, curStageIndex);
 
-    treeSlots.push({ xPercent: curX, width: curWidth, height: curHeight, isBack: false });
+    treeSlots.push({ xPercent: curX, width: curWidth, height: curHeight, bottom: 8 });
+    sceneTop = Math.max(sceneTop, 8 + curHeight);
 
-    // Scene height must fit whichever is tallest — usually the current
-    // tree once it's past the first few stages, sometimes a big grove tile.
-    scene.style.height = `${Math.max(200, frontWidth * 1.37 + 42, curHeight + 42)}px`;
+    scene.style.height = `${Math.max(200, sceneTop + 30)}px`;
 
     // A few grass tufts along the ground band, layered BETWEEN the back and
     // front tree rows (z-index) rather than on top of everything — so front
@@ -530,8 +523,7 @@
           // trees are bottom-anchored, so measuring from the scene's top
           // left birds floating in the sky whenever the scene grew taller
           // than the tree (e.g. a tall current tree next to small ones).
-          const treeBottom = tree.isBack ? 34 : 8;
-          const bottomPx = treeBottom + tree.height * (0.6 + ((i * 19) % 10) / 100);
+          const bottomPx = tree.bottom + tree.height * (0.6 + ((i * 19) % 10) / 100);
           prop.style.cssText = `left:${xPercent.toFixed(2)}%; bottom:${bottomPx.toFixed(0)}px; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
         } else {
           prop.style.cssText = `left:${xPercent.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
@@ -559,7 +551,7 @@
         if (!container) return;
         // fall back to the final stage — harvesting is only possible there
         const stage = h.pointsAtHarvest ? stageIndexForPoints(h.pointsAtHarvest) : maxStage;
-        window.AlmondTree.render(container, stage, false, 1);
+        window.AlmondTree.render(container, stage, false, 1, h.harvestNumber || i + 1);
         fitTreeToBox(container, stage);
       });
     }
