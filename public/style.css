@@ -92,32 +92,26 @@ body {
   line-height: 1.5;
 }
 
-/* ── Ambient Background — one soft brand-orange glow, kept deliberately simple ── */
+/* ── Page background: the painted woodland behind the whole site ──
+   A fixed element rather than `background-attachment: fixed`, which iOS
+   Safari ignores. The light wash on top keeps navy text readable over
+   the busier parts of the image without hiding the forest. */
 .ambient-bg {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+  background: #9DB57E url('forest-backdrop.jpg') center bottom / cover no-repeat;
 }
 
-.ambient-bg::before {
+.ambient-bg::after {
   content: '';
   position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 160, 30, 0.08) 0%, transparent 70%);
-  top: 6%;
-  left: 50%;
-  transform: translateX(-50%);
-  animation: ambientPulse 8s ease-in-out infinite;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0) 100%);
 }
 
-@keyframes ambientPulse {
-  0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
-  50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
-}
 
 /* ── Page Layout ── */
 .app-container {
@@ -239,19 +233,6 @@ body {
   height: 132px;
 }
 
-/* Painted woodland backdrop (misty trees, sunbeam, meadow) behind the
-   real trees — one static image, so no frame-to-frame consistency
-   problem; the trees in front are still the live SVG ones. Full-bleed
-   with rounded corners (no faded/vignette edges). */
-.grove-scene::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: url('forest-backdrop.jpg') center bottom / cover no-repeat;
-  border-radius: 18px;
-  z-index: 0;
-  pointer-events: none;
-}
 
 .grove-tree {
   position: absolute;
@@ -690,6 +671,12 @@ body {
   width: 100%;
   max-width: 380px;
   margin-bottom: 20px;
+  /* Frosted panel so the small hint text stays readable over the forest. */
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
 }
 
 .demo-label {
@@ -912,6 +899,17 @@ body {
   text-align: center;
   font-size: 0.7rem;
   color: var(--text-muted);
+}
+
+/* Text that sits directly on the forest background gets a soft white halo
+   and darker greys, so it stays readable over the busy parts of the image. */
+.app-subtitle, .stage-name, .stage-description, .grove-title,
+.progress-label, .progress-points, .app-footer {
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.95), 0 0 14px rgba(255, 255, 255, 0.8);
+}
+.app-subtitle, .stage-description, .progress-label, .progress-points,
+.app-footer, .app-footer a {
+  color: var(--text-primary);
 }
 
 .app-footer a {
