@@ -348,6 +348,11 @@ body {
 .tree-container {
   width: 100%;
   max-width: 480px;
+  /* Fallback only — JS sets this per-stage to the tree's actual measured
+     shape (see TREE_BOUNDS_BY_STAGE in app.js), since an early-stage sprite
+     and a full Enchanted Grove tree occupy very different proportions of
+     the canvas. Without that, small stages sit in a box sized for the
+     biggest tree and leave a huge dead gap above them. */
   aspect-ratio: 400 / 500;
   position: relative;
   z-index: 20;
@@ -355,7 +360,9 @@ body {
   align-items: center;
   justify-content: center;
   margin: 0 auto 12px;
-  transition: all var(--duration-slow) var(--ease-out);
+  transition: aspect-ratio var(--duration-slow) var(--ease-out),
+              transform var(--duration-slow) var(--ease-out),
+              opacity var(--duration-slow) var(--ease-out);
 }
 
 

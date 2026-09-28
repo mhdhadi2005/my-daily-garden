@@ -181,6 +181,7 @@
     $stageName.textContent = data.stage.name;
     $stageDescription.textContent = stageData ? stageData.description : "";
     window.AlmondTree.render($treeContainer, data.stage.index, animate, data.stageProgress || 0.5);
+    sizeHeroToStage(data.stage.index);
   }
 
   // ── Stats Rendering ──
@@ -329,6 +330,22 @@
     const pad = 8;
     svg.setAttribute("viewBox", `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
+  }
+
+  // Grove tiles are fixed-size thumbnails, so fitting the SVG's viewBox is
+  // enough there. The hero tree has room to breathe, so its *container*
+  // should also match each stage's actual shape — otherwise a tiny Seed
+  // sprite sits inside a box sized for a full Enchanted Grove tree, leaving
+  // a huge dead gap above it (the reported bug). Bounds are measured at
+  // progress=1, i.e. the largest a stage ever gets, so using them as the
+  // container size is always big enough — it just isn't perfectly snug at
+  // low progress within a stage, which is a minor tradeoff against not
+  // reflowing the whole page on every point earned.
+  function sizeHeroToStage(stageIndex) {
+    const box = TREE_BOUNDS_BY_STAGE[stageIndex];
+    if (!box) return;
+    $treeContainer.style.aspectRatio = `${box.width} / ${box.height}`;
+    fitTreeToBox($treeContainer, stageIndex);
   }
 
   // A harvested tree completed its whole cycle, so it should be drawn at the
