@@ -424,17 +424,20 @@
     // (fewer, bigger trees) can exceed it — grow to fit instead of clipping.
     scene.style.height = `${Math.max(132, frontWidth * 1.37 + 42)}px`;
 
+    const treeSlots = []; // {xPercent, topPx, heightPx} — reused below to anchor critters to a real tree
+
     shown.forEach((h, i) => {
       const isBack = i % 2 === 1;
       const centerPx = startCenterPx + step * i;
       const x = (centerPx / containerWidth) * 100;
       const width = isBack ? backWidth : frontWidth;
+      const height = width * 1.37;
       const num = h.harvestNumber || i + 1;
       const pts = h.pointsAtHarvest || 0;
 
       const slot = document.createElement("div");
       slot.className = `grove-tree ${isBack ? "is-back" : "is-front"}`;
-      slot.style.cssText = `left:${x.toFixed(2)}%; width:${width.toFixed(0)}px; height:${(width * 1.37).toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
+      slot.style.cssText = `left:${x.toFixed(2)}%; width:${width.toFixed(0)}px; height:${height.toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
       slot.title = `Tree #${num} — harvested at ${pts} pts`;
 
       const art = document.createElement("div");
@@ -442,19 +445,46 @@
       art.id = `grove-tree-${i}`;
       slot.appendChild(art);
       scene.appendChild(slot);
+
+      treeSlots.push({ xPercent: x, width, height, isBack });
     });
 
-    // Cosmetics earned from harvests, standing along the front of the grove
-    const props = cosmetics.slice(0, 5);
+    // Cosmetics earned from harvests — birds perch partway up a real tree
+    // (like the reference image), everything else stands grounded but
+    // anchored near a specific tree instead of floating independently
+    // along an evenly-spaced row.
+    const perchingTypes = ["owl", "peacock"]; // the only bird-like cosmetics in the catalog
+    // Most recently earned cosmetics, not the earliest 5 — otherwise a
+    // growing forest would forever show the same starter set and rarer
+    // later unlocks (owl, deer, fairy lantern...) would never appear.
+    const props = cosmetics.slice(-5);
     props.forEach((c, i) => {
       if (!window.Art || !window.Art.hasCritter(c.type)) return;
-      const x = 10 + ((i + 0.5) / props.length) * 80;
+      const tree = treeSlots.length ? treeSlots[i % treeSlots.length] : null;
+      const jitter = ((i * 37) % 11) - 5; // small deterministic per-slot offset, not random-per-render
+      const isPerched = perchingTypes.includes(c.type) && !!tree;
+
       const prop = document.createElement("div");
-      prop.className = "grove-prop";
+      prop.className = `grove-prop${isPerched ? " is-perched" : ""}`;
       prop.dataset.rarity = c.rarity || "common";
-      prop.style.cssText = `left:${x.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
       prop.title = `${c.label} (${c.rarity})`;
-      prop.innerHTML = window.Art.critter(c.type, 40);
+
+      if (tree) {
+        const xPercent = tree.xPercent + (jitter / containerWidth) * 100;
+        if (isPerched) {
+          // Sit within the canopy band (roughly the top third of the tree box)
+          // rather than at the trunk's base.
+          const topPx = tree.height * (0.12 + ((i * 19) % 10) / 60);
+          prop.style.cssText = `left:${xPercent.toFixed(2)}%; top:${topPx.toFixed(0)}px; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
+        } else {
+          prop.style.cssText = `left:${xPercent.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
+        }
+      } else {
+        const x = 10 + ((i + 0.5) / props.length) * 80;
+        prop.style.cssText = `left:${x.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
+      }
+
+      prop.innerHTML = window.Art.critter(c.type, isPerched ? 32 : 40);
       scene.appendChild(prop);
     });
 

@@ -303,6 +303,14 @@ body {
   animation-delay: var(--d, 0s);
 }
 
+/* Birds perch within a tree's canopy band instead of standing at the base —
+   positioned via an inline `top` (see renderForest), so this just needs to
+   cancel the default `bottom` anchor and sit above the trees it's on. */
+.grove-prop.is-perched {
+  bottom: auto;
+  z-index: 5;
+}
+
 .grove-prop[data-rarity="legendary"] .art-svg,
 .grove-prop[data-rarity="epic"] .art-svg {
   filter: drop-shadow(0 0 6px rgba(255, 160, 30, 0.55));
