@@ -292,7 +292,7 @@
         const spread = (stageIndex >= 7 ? 1.2 : 0.8) + (level * 0.2);
         const newAngle = angle - spread/2 + (spread / (numBranches - 1 || 1)) * i + randomRange(-0.2, 0.2);
         const lengthFactor = randomRange(0.6, 0.85);
-        buildTreeBranches(svg, endX, endY, newAngle, length * lengthFactor, thickness * 0.65, level + 1, maxLevel, stageIndex);
+        buildTreeBranches(svg, endX, endY, newAngle, length * lengthFactor, thickness * 0.72, level + 1, maxLevel, stageIndex);
       }
     } else {
       drawFoliage(svg, endX, endY, angle, stageIndex);
@@ -310,7 +310,7 @@
     // reads as one soft mass of foliage, closer to a painted canopy,
     // instead of a spray of separate leaf blades with visible gaps.
     const blobColor = stageIndex >= 7 ? "#E8B84B" : (stageIndex >= 6 ? "#AEB56A" : "#5FAE78");
-    const blobRadius = (stageIndex >= 8 ? 14 : 10) + currentProgress * 2;
+    const blobRadius = (stageIndex >= 8 ? 18 : 14) + currentProgress * 2;
     svg.appendChild(createSVGElement('ellipse', {
       cx: x, cy: y, rx: blobRadius, ry: blobRadius * 0.82,
       fill: blobColor, opacity: 0.4
@@ -504,7 +504,7 @@
         const h    = heights[stageIndex];
         const t    = thicknesses[stageIndex];
         const maxL = levels[stageIndex];
-        
+
         drawTrunk(treeGroup, h, t, stageIndex >= 7 ? "#4A2E19" : "#6B4423", stageIndex);
         buildTreeBranches(treeGroup, 200, 520 - h, -Math.PI / 2, h * 0.45, t * 0.6, 1, maxL, stageIndex);
 

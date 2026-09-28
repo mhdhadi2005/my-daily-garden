@@ -373,28 +373,39 @@ body {
   pointer-events: none;
 }
 
-/* ── Tree Container (hidden when forest is showing — forest row replaces it) ── */
+/* ── Tree Container: the current tree's slot inside the shared grove scene
+   (see renderForest in app.js) — not a standalone hero box. Width/height/
+   left are all set per-render in JS from the tree's actual stage shape. ── */
 .tree-container {
-  width: 100%;
-  max-width: 480px;
-  /* Fallback only — JS sets this per-stage to the tree's actual measured
-     shape (see TREE_BOUNDS_BY_STAGE in app.js), since an early-stage sprite
-     and a full Enchanted Grove tree occupy very different proportions of
-     the canvas. Without that, small stages sit in a box sized for the
-     biggest tree and leave a huge dead gap above them. */
-  aspect-ratio: 400 / 500;
-  position: relative;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 12px;
-  transition: aspect-ratio var(--duration-slow) var(--ease-out),
+  position: absolute;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 4; /* above regular grove trees (3), below perched props (5) */
+  transition: left 0.5s var(--ease-out), width 0.5s var(--ease-out), height 0.5s var(--ease-out),
               transform var(--duration-slow) var(--ease-out),
               opacity var(--duration-slow) var(--ease-out);
 }
 
+/* A soft, slowly-pulsing warm glow — the one deliberate cue that this is
+   the tree you're actively growing, not a static forest member. */
+.grove-tree-current::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2%;
+  width: 78%;
+  height: 45%;
+  background: radial-gradient(ellipse, rgba(255, 196, 92, 0.24) 0%, transparent 72%);
+  transform: translateX(-50%);
+  z-index: -1;
+  pointer-events: none;
+  animation: currentTreeGlow 3.5s ease-in-out infinite alternate;
+}
 
+@keyframes currentTreeGlow {
+  0%   { opacity: 0.5; }
+  100% { opacity: 1; }
+}
 
 .tree-container svg {
   width: 100%;
@@ -843,6 +854,12 @@ body {
   transition: all 0.5s var(--ease-out);
 }
 
+/* The tree container is centred on its slot via translateX(-50%); the
+   generic fade transforms above would replace that and make it jump
+   sideways by half its width for the length of the transition. */
+.tree-container.fade-out { transform: translateX(-50%) scale(0.95); }
+.tree-container.fade-in  { transform: translateX(-50%) scale(1); }
+
 /* ── Tree SVG Animations (injected by tree-stages.js) ── */
 @keyframes sway {
   0%, 100% { transform: rotate(var(--sway-start, -2deg)); }
@@ -912,10 +929,6 @@ body {
 
   .stage-dot-label {
     font-size: 0.5rem;
-  }
-
-  .tree-container {
-    max-width: 320px;
   }
 }
 

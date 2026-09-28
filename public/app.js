@@ -172,6 +172,9 @@
   }
 
   // ── Tree Rendering ──
+  // Sizing/positioning of $treeContainer now happens in renderForest — the
+  // current tree is one slot in the same continuous scene as past
+  // harvests, not a separate hero box (see renderForest for why).
   function renderTree(data, animate) {
     if (typeof window.AlmondTree === "undefined") {
       $treeContainer.innerHTML = '<p style="color:var(--text-muted)">Tree renderer not loaded</p>';
@@ -181,7 +184,6 @@
     $stageName.textContent = data.stage.name;
     $stageDescription.textContent = stageData ? stageData.description : "";
     window.AlmondTree.render($treeContainer, data.stage.index, animate, data.stageProgress || 0.5);
-    sizeHeroToStage(data.stage.index);
   }
 
   // ── Stats Rendering ──
@@ -302,18 +304,18 @@
   const TREE_BOUNDS_BY_STAGE = [
     { x: 87.5,  y: 463.7,  width: 225,   height: 86.3  },
     { x: 87.5,  y: 412.5,  width: 225,   height: 137.5 },
-    { x: 87.5,  y: 240.9,  width: 225,   height: 309.1 },
+    { x: 87.5,  y: 237.5,  width: 225,   height: 312.5 },
     { x: 87.5,  y: 138.6,  width: 225,   height: 411.4 },
     { x: 48.1,  y: 67.4,   width: 306.6, height: 482.6 },
-    { x: 87.5,  y: 67.2,   width: 232.9, height: 482.8 },
-    { x: 87.5,  y: 57.3,   width: 225,   height: 492.7 },
-    { x: 19,    y: 14.8,   width: 342,   height: 535.2 },
-    { x: -8.3,  y: -35.9,  width: 415.1, height: 585.9 },
+    { x: 87.5,  y: 66.5,   width: 232.9, height: 483.5 },
+    { x: 87.5,  y: 57,     width: 225,   height: 493   },
+    { x: 19,    y: 14.4,   width: 342,   height: 535.6 },
+    { x: -8.3,  y: -35.9,  width: 417,   height: 585.9 },
     { x: -10.6, y: -73.5,  width: 445.2, height: 623.5 },
-    { x: -71.4, y: -159.5, width: 484.5, height: 709.5 },
-    { x: -38.6, y: -131.9, width: 479,   height: 681.9 },
-    { x: -32.6, y: -134.3, width: 463.7, height: 684.3 },
-    { x: -37.4, y: -139.9, width: 445.9, height: 707.9 },
+    { x: -75,   y: -159.5, width: 489.1, height: 709.5 },
+    { x: -42.8, y: -131.9, width: 483.2, height: 681.9 },
+    { x: -36.8, y: -134.3, width: 467.8, height: 684.3 },
+    { x: -38.3, y: -139.9, width: 446.8, height: 707.9 },
   ];
 
   function fitTreeToBox(container, stageIndex) {
@@ -332,20 +334,17 @@
     svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
   }
 
-  // Grove tiles are fixed-size thumbnails, so fitting the SVG's viewBox is
-  // enough there. The hero tree has room to breathe, so its *container*
-  // should also match each stage's actual shape — otherwise a tiny Seed
-  // sprite sits inside a box sized for a full Enchanted Grove tree, leaving
-  // a huge dead gap above it (the reported bug). Bounds are measured at
-  // progress=1, i.e. the largest a stage ever gets, so using them as the
-  // container size is always big enough — it just isn't perfectly snug at
-  // low progress within a stage, which is a minor tradeoff against not
-  // reflowing the whole page on every point earned.
-  function sizeHeroToStage(stageIndex) {
-    const box = TREE_BOUNDS_BY_STAGE[stageIndex];
-    if (!box) return;
-    $treeContainer.style.aspectRatio = `${box.width} / ${box.height}`;
-    fitTreeToBox($treeContainer, stageIndex);
+  // How big the current tree's slot is relative to a nominal grove tree,
+  // by stage — a Seed should look like a thin new sprout next to the
+  // grown forest, an Enchanted Grove tree should dominate it. Built from
+  // TREE_BOUNDS_BY_STAGE's real measured heights rather than a guessed
+  // curve, so it tracks whatever the renderer's actual geometry is.
+  function currentTreeScale(stageIndex) {
+    const box  = TREE_BOUNDS_BY_STAGE[stageIndex];
+    const minH = TREE_BOUNDS_BY_STAGE[0].height;
+    const maxH = TREE_BOUNDS_BY_STAGE[TREE_BOUNDS_BY_STAGE.length - 1].height;
+    const t = Math.max(0, Math.min(1, (box.height - minH) / (maxH - minH)));
+    return 0.5 + t * 1.3; // 0.5x (Seed) .. 1.8x (Enchanted Grove) a nominal front tree
   }
 
   // A harvested tree completed its whole cycle, so it should be drawn at the
@@ -359,6 +358,13 @@
     return idx;
   }
 
+  // The current tree and the forest of past harvests used to be two
+  // separate things — a big hero box above a small strip below — so
+  // completing a tree reset the whole prominent area back down to a tiny
+  // seed in mostly-empty space. That's the literal "starting from
+  // scratch" feeling Harry called out. Now there's one scene: the forest
+  // never resets, and the current tree is just its newest (and, early on,
+  // smallest) member, growing in place among the others.
   function renderForest(data) {
     const totalHarvests = data.totalHarvests || 0;
     const cosmetics     = data.cosmetics || [];
@@ -371,30 +377,27 @@
       $gardenCritters.innerHTML = "";
       $gardenCritters.style.display = "none";
     }
-
-    if (totalHarvests === 0) {
-      $gardenBackdrop.style.display = "none";
-      return;
-    }
     $gardenBackdrop.style.display = "";
 
-    // The current growing tree stays the hero (rendered in #tree-container).
-    // This is the grove of past harvests: trees staggered across two depth
-    // rows so it reads as a little treeline rather than a row of clones.
-    const head = document.createElement("div");
-    head.className = "grove-head";
-    head.innerHTML =
-      `<span class="grove-title">Your Forest</span>` +
-      `<span class="grove-count">${totalHarvests} tree${totalHarvests === 1 ? "" : "s"} grown</span>`;
-    $gardenBackdrop.appendChild(head);
+    if (totalHarvests > 0) {
+      const head = document.createElement("div");
+      head.className = "grove-head";
+      head.innerHTML =
+        `<span class="grove-title">Your Forest</span>` +
+        `<span class="grove-count">${totalHarvests} tree${totalHarvests === 1 ? "" : "s"} grown</span>`;
+      $gardenBackdrop.appendChild(head);
+    }
 
     const scene = document.createElement("div");
     scene.className = "grove-scene";
     $gardenBackdrop.appendChild(scene);
 
-    const shown  = forest.slice(0, GROVE_MAX_TREES);
+    // Most recently harvested, not the oldest — otherwise a forest past
+    // GROVE_MAX_TREES would forever show its first few trees and never
+    // the ones nearest in time to what you're growing right now.
+    const shown  = forest.slice(-GROVE_MAX_TREES);
     const hidden = forest.length - shown.length;
-    const n = shown.length;
+    const n = shown.length + 1; // +1 for the current tree's own slot
 
     // Canopies need to actually overlap to read as one forest rather than a
     // row of separate trees. Position by a FIXED overlap step (not spread
@@ -420,10 +423,6 @@
     const backWidth = frontWidth * 0.72;
     const startCenterPx = (containerWidth - groupWidth) / 2 + frontWidth / 2;
 
-    // Scene height is fixed in CSS for the common case, but a small grove
-    // (fewer, bigger trees) can exceed it — grow to fit instead of clipping.
-    scene.style.height = `${Math.max(132, frontWidth * 1.37 + 42)}px`;
-
     const treeSlots = []; // {xPercent, topPx, heightPx} — reused below to anchor critters to a real tree
 
     shown.forEach((h, i) => {
@@ -448,6 +447,46 @@
 
       treeSlots.push({ xPercent: x, width, height, isBack });
     });
+
+    // The current tree's slot — sized by its actual stage (a Seed reads as
+    // a thin new sprout, an Enchanted Grove tree dominates), not the
+    // uniform tile size past harvests use. Positioned at the group's next
+    // slot so it sits naturally beside its most recent predecessor, then
+    // clamped so its own (very variable) width never overflows the scene.
+    const curStageIndex = data.stage.index;
+    const curScale  = currentTreeScale(curStageIndex);
+    const curWidth  = frontWidth * curScale;
+    const curBox    = TREE_BOUNDS_BY_STAGE[curStageIndex];
+    const curHeight = curBox ? curWidth * (curBox.height / curBox.width) : curWidth * 1.37;
+
+    // Overlap with its immediate predecessor by real widths, not the
+    // uniform step — the current tree's width varies far more than a
+    // grove tile's (0.5x-1.8x), so re-using `step` as-is could leave a
+    // visible gap (undersized current tree) or excess overlap (oversized).
+    let curCenterPx;
+    if (shown.length > 0) {
+      const prevIsBack   = (shown.length - 1) % 2 === 1;
+      const prevWidth    = prevIsBack ? backWidth : frontWidth;
+      const prevCenterPx = startCenterPx + step * (shown.length - 1);
+      curCenterPx = prevCenterPx + (prevWidth / 2 + curWidth / 2) * (1 - overlapFraction);
+    } else {
+      curCenterPx = containerWidth / 2;
+    }
+    curCenterPx = Math.max(curWidth / 2 + 4, Math.min(containerWidth - curWidth / 2 - 4, curCenterPx));
+    const curX = (curCenterPx / containerWidth) * 100;
+
+    $treeContainer.classList.add("grove-tree-current");
+    $treeContainer.style.left = `${curX.toFixed(2)}%`;
+    $treeContainer.style.width = `${curWidth.toFixed(0)}px`;
+    $treeContainer.style.height = `${curHeight.toFixed(0)}px`;
+    scene.appendChild($treeContainer);
+    fitTreeToBox($treeContainer, curStageIndex);
+
+    treeSlots.push({ xPercent: curX, width: curWidth, height: curHeight, isBack: false });
+
+    // Scene height must fit whichever is tallest — usually the current
+    // tree once it's past the first few stages, sometimes a big grove tile.
+    scene.style.height = `${Math.max(132, frontWidth * 1.37 + 42, curHeight + 42)}px`;
 
     // A few grass tufts along the ground band, layered BETWEEN the back and
     // front tree rows (z-index) rather than on top of everything — so front
