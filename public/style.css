@@ -713,15 +713,19 @@ body {
   margin-bottom: 8px;
 }
 
+/* Wrapping grid, not a single row: 14 stages in one row overflowed the
+   demo panel and pushed the last labels out onto the forest background. */
 .stage-selector {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 4px 2px;
   width: 100%;
 }
 
 .stage-dot-wrapper {
-  flex: 1;
   display: flex;
+  user-select: none;
+  -webkit-user-select: none;
   flex-direction: column;
   align-items: center;
   gap: 4px;
@@ -757,11 +761,10 @@ body {
 }
 
 .stage-dot-label {
-  font-size: 0.55rem;
-  color: var(--text-muted);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
   text-align: center;
-  line-height: 1.15;
-  max-width: 48px;
+  line-height: 1.2;
   font-weight: 400;
 }
 
@@ -944,9 +947,6 @@ body {
     font-size: 1.3rem;
   }
 
-  .stage-dot-label {
-    font-size: 0.5rem;
-  }
 }
 
 @media (max-width: 360px) {
