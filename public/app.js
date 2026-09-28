@@ -302,17 +302,17 @@
   const TREE_BOUNDS_BY_STAGE = [
     { x: 87.5,  y: 463.7,  width: 225,   height: 86.3  },
     { x: 87.5,  y: 412.5,  width: 225,   height: 137.5 },
-    { x: 87.5,  y: 242.3,  width: 225,   height: 307.7 },
+    { x: 87.5,  y: 240.9,  width: 225,   height: 309.1 },
     { x: 87.5,  y: 138.6,  width: 225,   height: 411.4 },
-    { x: 53.8,  y: 45.9,   width: 261.9, height: 504.1 },
+    { x: 48.1,  y: 67.4,   width: 306.6, height: 482.6 },
     { x: 87.5,  y: 67.2,   width: 232.9, height: 482.8 },
     { x: 87.5,  y: 57.3,   width: 225,   height: 492.7 },
     { x: 19,    y: 14.8,   width: 342,   height: 535.2 },
     { x: -8.3,  y: -35.9,  width: 415.1, height: 585.9 },
     { x: -10.6, y: -73.5,  width: 445.2, height: 623.5 },
     { x: -71.4, y: -159.5, width: 484.5, height: 709.5 },
-    { x: -35.4, y: -131.9, width: 475.8, height: 681.9 },
-    { x: -27.3, y: -134.3, width: 458.4, height: 684.3 },
+    { x: -38.6, y: -131.9, width: 479,   height: 681.9 },
+    { x: -32.6, y: -134.3, width: 463.7, height: 684.3 },
     { x: -37.4, y: -139.9, width: 445.9, height: 707.9 },
   ];
 

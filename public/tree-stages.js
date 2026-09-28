@@ -210,32 +210,37 @@
     svg.appendChild(group);
   }
 
+  // Five evenly-spaced petals reading as one designed flower, not a
+  // spray of randomly-sized overlapping circles — same element budget
+  // as before (this used to go up to 6 petals + 1 centre), just a more
+  // deliberate arrangement.
   function drawBlossom(svg, x, y, size) {
     const group = createSVGElement('g', {
       class: "tree-blossom",
       style: `transform-origin: ${x}px ${y}px; animation-delay: ${randomRange(0, 2)}s`
     });
-    
-    const colors = ["#F2A49B", "#FADADD", "#FFF0F3"];
-    const petals = Math.floor(randomRange(4, 6));
-    
+
+    const petalColor = random() > 0.5 ? "#FADADD" : "#F2A49B";
+    const petals = 5;
+    const startAngle = randomRange(0, Math.PI * 2);
+
     for (let i = 0; i < petals; i++) {
-      const angle = (i / petals) * Math.PI * 2;
-      const px = x + Math.cos(angle) * size * 0.8;
-      const py = y + Math.sin(angle) * size * 0.8;
-      
+      const angle = startAngle + (i / petals) * Math.PI * 2;
+      const px = x + Math.cos(angle) * size * 0.72;
+      const py = y + Math.sin(angle) * size * 0.72;
+
       group.appendChild(createSVGElement('circle', {
         cx: px,
         cy: py,
-        r: size * randomRange(0.6, 1),
-        fill: colors[Math.floor(randomRange(0, colors.length))]
+        r: size * 0.6,
+        fill: petalColor
       }));
     }
-    
+
     group.appendChild(createSVGElement('circle', {
-      cx: x, cy: y, r: size * 0.4, fill: "#E85D75"
+      cx: x, cy: y, r: size * 0.38, fill: "#E85D75"
     }));
-    
+
     svg.appendChild(group);
   }
 
@@ -298,6 +303,18 @@
     const leafColorBase = stageIndex >= 7 ? "#D4A017" : (stageIndex >= 6 ? "#8F974A" : "#3E8E5A");
     const leafColor2 = stageIndex >= 7 ? "#B8860B" : "#13612E";
     const colors = [leafColorBase, leafColor2];
+
+    // A single soft, low-opacity blob per branch tip (not per leaf, so
+    // cost stays bounded by branch count, not leaf count — see the
+    // node-count note on drawLeaf above). Gives the cluster volume so it
+    // reads as one soft mass of foliage, closer to a painted canopy,
+    // instead of a spray of separate leaf blades with visible gaps.
+    const blobColor = stageIndex >= 7 ? "#E8B84B" : (stageIndex >= 6 ? "#AEB56A" : "#5FAE78");
+    const blobRadius = (stageIndex >= 8 ? 14 : 10) + currentProgress * 2;
+    svg.appendChild(createSVGElement('ellipse', {
+      cx: x, cy: y, rx: blobRadius, ry: blobRadius * 0.82,
+      fill: blobColor, opacity: 0.4
+    }));
     if (stageIndex === 6) colors.push("#D4A017");
     if (stageIndex === 4) colors.push("#6B8E4E");
     if (stageIndex === 6 && currentProgress >= 0.7) colors.push("#B86500");
