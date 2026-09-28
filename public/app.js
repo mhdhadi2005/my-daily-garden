@@ -526,10 +526,13 @@
       if (tree) {
         const xPercent = tree.xPercent + (jitter / containerWidth) * 100;
         if (isPerched) {
-          // Sit within the canopy band (roughly the top third of the tree box)
-          // rather than at the trunk's base.
-          const topPx = tree.height * (0.12 + ((i * 19) % 10) / 60);
-          prop.style.cssText = `left:${xPercent.toFixed(2)}%; top:${topPx.toFixed(0)}px; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
+          // Sit in the tree's upper canopy, measured from the ground up —
+          // trees are bottom-anchored, so measuring from the scene's top
+          // left birds floating in the sky whenever the scene grew taller
+          // than the tree (e.g. a tall current tree next to small ones).
+          const treeBottom = tree.isBack ? 34 : 8;
+          const bottomPx = treeBottom + tree.height * (0.6 + ((i * 19) % 10) / 100);
+          prop.style.cssText = `left:${xPercent.toFixed(2)}%; bottom:${bottomPx.toFixed(0)}px; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
         } else {
           prop.style.cssText = `left:${xPercent.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
         }
