@@ -36,6 +36,13 @@
         transform-origin: center;
         animation: sway 4s ease-in-out infinite alternate;
       }
+      .tree-clump {
+        animation: clumpSway 5s ease-in-out infinite alternate;
+      }
+      @keyframes clumpSway {
+        0% { transform: rotate(-0.8deg); }
+        100% { transform: rotate(0.8deg); }
+      }
       .tree-blossom {
         transform-origin: center;
         animation: pulseSway 3.5s ease-in-out infinite alternate;
@@ -90,35 +97,31 @@
     return el;
   }
 
+  // Trees stand in the painted meadow backdrop, so no big dark soil mound
+  // (it read as a hole in the grass). Seed/sapling get a small freshly-
+  // planted dirt patch; grown trees just a soft grass shadow and a few
+  // short root flares at the trunk base.
   function drawSoil(svg, stageIndex) {
-    const soil = createSVGElement('path', {
-      d: "M 100 520 Q 200 480 300 520 Q 350 540 200 550 Q 50 540 100 520 Z",
-      fill: "#3D2B1F"
-    });
-    svg.appendChild(soil);
-
-    const textureGroup = createSVGElement('g');
-    for (let i = 0; i < 30; i++) {
-      textureGroup.appendChild(createSVGElement('circle', {
-        cx: randomRange(120, 280),
-        cy: randomRange(505, 540),
-        r: randomRange(1, 3),
-        fill: "#5C4033",
-        opacity: 0.7
+    if (stageIndex <= 1) {
+      svg.appendChild(createSVGElement('ellipse', {
+        cx: 200, cy: 521, rx: 34, ry: 7, fill: "#6B4A33"
       }));
+      return;
     }
-    svg.appendChild(textureGroup);
 
-    if (stageIndex >= 1) {
-      const rootThickness = stageIndex > 2 ? 4 : 2;
-      const rootCount = Math.min(stageIndex + 2, 8);
+    svg.appendChild(createSVGElement('ellipse', {
+      cx: 200, cy: 522, rx: 60 + stageIndex * 4, ry: 9, fill: "rgba(30, 55, 25, 0.3)"
+    }));
+
+    if (stageIndex >= 3) {
+      const rootCount = Math.min(stageIndex, 6);
       for (let i = 0; i < rootCount; i++) {
-        const dir = randomRange(0, 1) > 0.5 ? 1 : -1;
-        const rootPath = `M 200 515 Q ${200 + dir * 30} ${530 + randomRange(-10, 20)} ${200 + dir * randomRange(40, 90)} ${535 + randomRange(0, 15)}`;
+        const dir = i % 2 === 0 ? 1 : -1;
+        const reach = randomRange(18, 34);
         svg.appendChild(createSVGElement('path', {
-          d: rootPath,
-          stroke: "#4A2F1D",
-          "stroke-width": rootThickness + randomRange(0, 2),
+          d: `M 200 512 Q ${200 + dir * reach * 0.5} ${518} ${200 + dir * reach} ${522}`,
+          stroke: "#5C3A20",
+          "stroke-width": randomRange(3, 6),
           fill: "none",
           "stroke-linecap": "round"
         }));
@@ -263,11 +266,42 @@
     svg.appendChild(group);
   }
 
+  // Foliage is queued during branch recursion and drawn after it, so the
+  // canopy sits on top of every branch — drawing it inline let later
+  // branches slice across earlier clumps. Inner-joint "filler" clumps are
+  // queued before their children, so they end up behind the tip clumps.
+  let foliageQueue = [];
+  function flushFoliage(svg, originX, originY) {
+    const q = foliageQueue;
+    foliageQueue = [];
+    // Whole canopy sways as one piece around the top of the trunk.
+    const canopy = createSVGElement('g', {
+      class: "tree-clump",
+      style: `transform-origin: ${originX}px ${originY}px`
+    });
+    const layers = {
+      dark:  createSVGElement('g'),
+      mid:   createSVGElement('g'),
+      light: createSVGElement('g'),
+      extra: createSVGElement('g'),
+    };
+    canopy.appendChild(layers.dark);
+    canopy.appendChild(layers.mid);
+    canopy.appendChild(layers.light);
+    canopy.appendChild(layers.extra);
+    q.forEach(([kind, x, y, angle, stageIndex]) => {
+      if (kind === "fill") drawClump(layers, x, y, clumpRadius(stageIndex) * 0.9, stageIndex);
+      else drawFoliage(layers.extra, x, y, angle, stageIndex, layers);
+    });
+    svg.appendChild(canopy);
+  }
+
   function buildTreeBranches(svg, x, y, angle, length, thickness, level, maxLevel, stageIndex) {
     if (level > maxLevel) return;
-    
+
     const endX = x + Math.cos(angle) * length;
     const endY = y + Math.sin(angle) * length;
+    if (maxLevel >= 3 && level >= 2 && level < maxLevel) foliageQueue.push(["fill", endX, endY, angle, stageIndex]);
     
     if (level > 0) {
       const color = stageIndex >= 7 ? "#4A2E19" : "#6B4423";
@@ -289,46 +323,66 @@
       if (stageIndex >= 8 && level > 1) numBranches = random() > 0.2 ? 3 : 2;
       
       for (let i = 0; i < numBranches; i++) {
-        const spread = (stageIndex >= 7 ? 1.2 : 0.8) + (level * 0.2);
+        const spread = (stageIndex >= 7 ? 1.45 : 1.15) + (level * 0.2);
         const newAngle = angle - spread/2 + (spread / (numBranches - 1 || 1)) * i + randomRange(-0.2, 0.2);
         const lengthFactor = randomRange(0.6, 0.85);
         buildTreeBranches(svg, endX, endY, newAngle, length * lengthFactor, thickness * 0.72, level + 1, maxLevel, stageIndex);
       }
     } else {
-      drawFoliage(svg, endX, endY, angle, stageIndex);
+      foliageQueue.push(["tip", endX, endY, angle, stageIndex]);
     }
   }
 
-  function drawFoliage(svg, x, y, angle, stageIndex) {
-    const leafColorBase = stageIndex >= 7 ? "#D4A017" : (stageIndex >= 6 ? "#8F974A" : "#3E8E5A");
-    const leafColor2 = stageIndex >= 7 ? "#B8860B" : "#13612E";
-    const colors = [leafColorBase, leafColor2];
+  // Canopy palettes: [shadow, mid, highlight]. Flat layered tones, like
+  // the chosen mockup — each clump is a dark base, a mid-tone body offset
+  // up-left, and a small light highlight, which is what makes a flat
+  // illustration read as round and lit from above.
+  function canopyPalette(stageIndex) {
+    // Late stages ripen to a warm olive-gold rather than pure yellow —
+    // pure yellow clumps read as balloons, not foliage.
+    if (stageIndex >= 7) return ["#5E6424", "#8E8F35", "#C2B85E"];
+    if (stageIndex === 6) return ["#4F6A2C", "#7A9142", "#AFC07A"];
+    return ["#2C6A43", "#3E8E5A", "#6FAE80"];
+  }
 
-    // A single soft, low-opacity blob per branch tip (not per leaf, so
-    // cost stays bounded by branch count, not leaf count — see the
-    // node-count note on drawLeaf above). Gives the cluster volume so it
-    // reads as one soft mass of foliage, closer to a painted canopy,
-    // instead of a spray of separate leaf blades with visible gaps.
-    const blobColor = stageIndex >= 7 ? "#E8B84B" : (stageIndex >= 6 ? "#AEB56A" : "#5FAE78");
-    const blobRadius = (stageIndex >= 8 ? 18 : 14) + currentProgress * 2;
-    svg.appendChild(createSVGElement('ellipse', {
-      cx: x, cy: y, rx: blobRadius, ry: blobRadius * 0.82,
-      fill: blobColor, opacity: 0.4
-    }));
-    if (stageIndex === 6) colors.push("#D4A017");
-    if (stageIndex === 4) colors.push("#6B8E4E");
-    if (stageIndex === 6 && currentProgress >= 0.7) colors.push("#B86500");
-    
-    const baseLeaves = stageIndex >= 3 ? Math.floor(randomRange(3, 7)) : Math.floor(randomRange(1, 3));
-    const bonusLeaves = Math.floor(currentProgress * 4);
-    const numLeaves = baseLeaves + bonusLeaves;
-    
-    for (let i = 0; i < numLeaves; i++) {
-      const rot = (angle * 180 / Math.PI) + randomRange(-90, 90);
-      const size = randomRange(8, 14) * (stageIndex >= 8 ? 1.2 : 1);
-      const color = colors[Math.floor(randomRange(0, colors.length))];
-      const offset = i >= baseLeaves ? randomRange(2, 6) : 0;
-      drawLeaf(svg, x + randomRange(-5, 5) + offset, y + randomRange(-5, 5) + offset, size, color, rot);
+  // One bushy clump: a few overlapping circles instead of a spray of
+  // separate leaf blades. ~5 elements per branch tip — fewer than the leaf
+  // spray it replaces, so this is a node-count win too.
+  //
+  // Each tone goes into a shared per-tree layer (layers.dark/mid/light)
+  // rather than the clump's own group: painting every clump's shadow
+  // first, then every mid-tone, then every highlight merges the clumps
+  // into one scalloped crown. Per-clump grouping stacked them as separate
+  // shaded balls, which read as bubbles, not a canopy.
+  function drawClump(layers, x, y, r, stageIndex) {
+    const [dark, mid, light] = canopyPalette(stageIndex);
+    for (let i = 0; i < 2; i++) {
+      const a = randomRange(0, Math.PI * 2);
+      layers.dark.appendChild(createSVGElement('circle', {
+        cx: x + Math.cos(a) * r * 0.75, cy: y + Math.sin(a) * r * 0.6, r: r * 0.55, fill: dark
+      }));
+    }
+    layers.dark.appendChild(createSVGElement('circle', { cx: x, cy: y, r: r, fill: dark }));
+    layers.mid.appendChild(createSVGElement('circle', { cx: x - r * 0.15, cy: y - r * 0.2, r: r * 0.8, fill: mid }));
+    layers.light.appendChild(createSVGElement('ellipse', { cx: x - r * 0.25, cy: y - r * 0.5, rx: r * 0.5, ry: r * 0.3, fill: light, opacity: 0.85 }));
+  }
+
+  function clumpRadius(stageIndex) {
+    const base = stageIndex >= 8 ? 26 : (stageIndex >= 4 ? 22 : 17);
+    return base + currentProgress * 3 + randomRange(-2, 2);
+  }
+
+  // `svg` here is the extras layer (blossoms, buds, almonds) drawn above the canopy.
+  function drawFoliage(svg, x, y, angle, stageIndex, layers) {
+    const r = clumpRadius(stageIndex);
+    drawClump(layers, x, y, r, stageIndex);
+
+    // Blossom stage: small pink flowers dotted over the canopy, like the mockup.
+    if (stageIndex === 4) {
+      const n = 2 + Math.floor(currentProgress * 2);
+      for (let i = 0; i < n; i++) {
+        drawBlossom(svg, x + randomRange(-r * 0.7, r * 0.7), y + randomRange(-r * 0.7, r * 0.5), randomRange(2.6, 3.6));
+      }
     }
 
     if (stageIndex === 2 && currentProgress >= 0.7) {
@@ -491,7 +545,10 @@
         }
       }
       else {
-        const heights =    [0, 0, 150, 200, 200, 200, 210, 220, 240, 250, 260, 270, 270, 280];
+        // Trunk height to the first fork. Kept short relative to the canopy
+        // (trunk ~40% of the tree, like a real almond / the chosen mockup)
+        // — the old values made a tall bare pole with a small cap on top.
+        const heights =    [0, 0, 120, 150, 155, 160, 165, 170, 180, 185, 190, 195, 195, 200];
         const thicknesses = [0, 0,  15,  25,  25,  25,  28,  32,  50,  55,  58,  62,  62,  65];
         // Branch depth — each +1 here multiplies node count by ~2.7x (the
         // branching factor below), so this looks small but isn't. The old
@@ -506,7 +563,8 @@
         const maxL = levels[stageIndex];
 
         drawTrunk(treeGroup, h, t, stageIndex >= 7 ? "#4A2E19" : "#6B4423", stageIndex);
-        buildTreeBranches(treeGroup, 200, 520 - h, -Math.PI / 2, h * 0.45, t * 0.6, 1, maxL, stageIndex);
+        buildTreeBranches(treeGroup, 200, 520 - h, -Math.PI / 2, h * 0.62, t * 0.6, 1, maxL, stageIndex);
+        flushFoliage(treeGroup, 200, 520 - h);
 
         if (stageIndex === 4) {
           for (let i = 0; i < 15; i++) {
@@ -613,6 +671,7 @@
                 drawTrunk(treeGroup, h, stageIndex >= 12 ? 8 : 4, "#6B4423", 2);
                 if (stageIndex >= 12) {
                     buildTreeBranches(treeGroup, sx, 520 - h, -Math.PI / 2, h * 0.4, 4, 1, 2, stageIndex);
+                    flushFoliage(treeGroup, sx, 520 - h);
                     for(let k=0; k<3; k++) {
                         drawAlmond(treeGroup, sx + randomRange(-15, 15), 520 - h + randomRange(-10, 20), randomRange(4, 6), "#DAA520");
                     }
