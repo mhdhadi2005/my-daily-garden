@@ -305,6 +305,30 @@ body {
   filter: none;
 }
 
+/* Harvested trees are still life. Every blossom, almond, sparkle and
+   butterfly in a tree carries its own infinite CSS animation — with a
+   full forest that was ~1,800 animations repainting SVG every frame, which
+   froze the page and made the stage dots feel unclickable. Only the
+   current tree animates now. Falling petals/leaves are hidden rather than
+   frozen mid-air. */
+.grove-tree-art * {
+  animation: none !important;
+}
+.grove-tree-art .falling {
+  display: none;
+}
+
+/* The current tree at late stages still carries ~160 twinkling sparkles
+   and ~40 bobbing almonds. A fraction of them moving reads just as
+   alive; the rest hold still at a steady glow. */
+.tree-container .tree-sparkle:not(:nth-child(4n)) {
+  animation: none;
+  opacity: 0.7;
+}
+.tree-container .tree-fruit:not(:nth-child(3n)) {
+  animation: none;
+}
+
 .grove-tree-art,
 .grove-tree-art svg {
   width: 100%;
