@@ -394,16 +394,47 @@
 
     const shown  = forest.slice(0, GROVE_MAX_TREES);
     const hidden = forest.length - shown.length;
+    const n = shown.length;
+
+    // Canopies need to actually overlap to read as one forest rather than a
+    // row of separate trees. Position by a FIXED overlap step (not spread
+    // across the full container width regardless of count) — spreading
+    // full-width was the bug in an earlier version of this: with only 2
+    // trees, "evenly across 0-100%" put them at opposite edges, further
+    // apart than ever despite being bigger. Instead: pick a natural tree
+    // size, pack trees at a constant overlap step, and only shrink the
+    // whole group if it would legitimately overflow the container (many
+    // trees) — then center the resulting group in the available width.
+    const containerWidth = $gardenBackdrop.clientWidth || 380;
+    const overlapFraction = 0.4; // each tree's leading edge sits this far into the previous one
+    let frontWidth = 100;
+    let step = frontWidth * (1 - overlapFraction);
+    let groupWidth = frontWidth + step * Math.max(0, n - 1);
+    const maxGroupWidth = containerWidth * 0.94;
+    if (groupWidth > maxGroupWidth) {
+      const scale = maxGroupWidth / groupWidth;
+      frontWidth *= scale;
+      step *= scale;
+      groupWidth = maxGroupWidth;
+    }
+    const backWidth = frontWidth * 0.72;
+    const startCenterPx = (containerWidth - groupWidth) / 2 + frontWidth / 2;
+
+    // Scene height is fixed in CSS for the common case, but a small grove
+    // (fewer, bigger trees) can exceed it — grow to fit instead of clipping.
+    scene.style.height = `${Math.max(132, frontWidth * 1.37 + 42)}px`;
 
     shown.forEach((h, i) => {
       const isBack = i % 2 === 1;
-      const x = ((i + 0.5) / shown.length) * 100;
+      const centerPx = startCenterPx + step * i;
+      const x = (centerPx / containerWidth) * 100;
+      const width = isBack ? backWidth : frontWidth;
       const num = h.harvestNumber || i + 1;
       const pts = h.pointsAtHarvest || 0;
 
       const slot = document.createElement("div");
       slot.className = `grove-tree ${isBack ? "is-back" : "is-front"}`;
-      slot.style.cssText = `left:${x.toFixed(2)}%; --d:${(i * 0.06).toFixed(2)}s`;
+      slot.style.cssText = `left:${x.toFixed(2)}%; width:${width.toFixed(0)}px; height:${(width * 1.37).toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
       slot.title = `Tree #${num} — harvested at ${pts} pts`;
 
       const art = document.createElement("div");
