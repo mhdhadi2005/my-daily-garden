@@ -449,6 +449,21 @@
       treeSlots.push({ xPercent: x, width, height, isBack });
     });
 
+    // A few grass tufts along the ground band, layered BETWEEN the back and
+    // front tree rows (z-index) rather than on top of everything — so front
+    // trees overlap them and they read as ground the forest stands in, not
+    // stickers scattered over it. This is deliberately a single added layer,
+    // not several: see the "simplicity over decoration" note on this project.
+    const tuftCount = Math.min(6, Math.max(3, n + 1));
+    for (let i = 0; i < tuftCount; i++) {
+      const x = 6 + (i / Math.max(1, tuftCount - 1)) * 88;
+      const tuft = document.createElement("div");
+      tuft.className = "grove-tuft";
+      tuft.style.cssText = `left:${x.toFixed(2)}%; --d:${(i * 0.05).toFixed(2)}s`;
+      tuft.innerHTML = window.Art.decor("grass", 15 + (i % 3) * 4);
+      scene.appendChild(tuft);
+    }
+
     // Cosmetics earned from harvests — birds perch partway up a real tree
     // (like the reference image), everything else stands grounded but
     // anchored near a specific tree instead of floating independently

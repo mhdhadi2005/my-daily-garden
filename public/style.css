@@ -271,6 +271,21 @@ body {
   z-index: 3;
 }
 
+/* Sits between the back row (z-index 1) and front row (z-index 3) so
+   front trees visually overlap the grass like ground the forest stands
+   in, not decoration floating on top of it. */
+.grove-tuft {
+  position: absolute;
+  bottom: 2px;
+  transform: translateX(-50%);
+  z-index: 2;
+  line-height: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  animation: groveIn 0.5s var(--ease-out) both;
+  animation-delay: var(--d, 0s);
+}
+
 /* back row sits higher and slightly hazier — cheap but effective depth,
    and its smaller size (also set in JS) is what makes it read as further
    away rather than just "the same tree, dimmer" */

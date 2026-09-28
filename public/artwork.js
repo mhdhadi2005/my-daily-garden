@@ -275,6 +275,14 @@
       <circle cx="20" cy="24.6" r="1.7" fill="${C.violet}"/>`,
   };
 
+  // ── Ground decoration (20 x 20, no ground shadow — these sit ON the ground) ──
+  const DECOR = {
+    grass: `
+      <path d="M4 18 q0 -8 2 -11" stroke="${C.green}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <path d="M10 18 q1 -10 -0.5 -14" stroke="${C.greenDk}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <path d="M16 18 q0 -7 -2.5 -10" stroke="${C.green}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
+  };
+
   // ── UI icons (24 x 24) ──
   const ICON = {
     flame: `
@@ -342,6 +350,11 @@
       const body = ICON[name];
       if (!body) return "";
       return wrap(24, body, size || 22, "art-icon");
+    },
+    decor(name, size) {
+      const body = DECOR[name];
+      if (!body) return "";
+      return wrap(20, body, size || 18, "art-decor");
     },
     hasCritter: (t) => !!CRITTER[t],
   };
