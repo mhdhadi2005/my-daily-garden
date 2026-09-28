@@ -486,7 +486,7 @@
 
     // Scene height must fit whichever is tallest — usually the current
     // tree once it's past the first few stages, sometimes a big grove tile.
-    scene.style.height = `${Math.max(132, frontWidth * 1.37 + 42, curHeight + 42)}px`;
+    scene.style.height = `${Math.max(200, frontWidth * 1.37 + 42, curHeight + 42)}px`;
 
     // A few grass tufts along the ground band, layered BETWEEN the back and
     // front tree rows (z-index) rather than on top of everything — so front
