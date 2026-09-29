@@ -318,7 +318,16 @@
     { x: -14.7, y: -107.2, width: 471.0, height: 640.9 },
   ];
 
-  function fitTreeToBox(container, stageIndex) {
+  // Forest (harvested) trees: a mature almond structure with a seasonal look
+  // and no magic effects — see renderForest. Bounds measured the same way
+  // as TREE_BOUNDS_BY_STAGE, for that stage rendered with a look.
+  const FOREST_TREE_STAGE = 8;
+  const FOREST_LOOK_ORDER = ["blossom", "summer", "autumn", "white", "spring", "golden"];
+  // Typical box (widths measured 372–442 across looks/variants); the widest
+  // shapes spill slightly rather than shrinking every tree to fit them.
+  const FOREST_TREE_BOUNDS = { x: -12, y: -24, width: 424, height: 552 };
+
+  function fitTreeToBox(container, stageIndex, boxOverride) {
     const svg = container.querySelector("svg");
     if (!svg) return;
     svg.querySelectorAll("rect").forEach((r) => {
@@ -327,7 +336,7 @@
       }
     });
 
-    const box = TREE_BOUNDS_BY_STAGE[stageIndex];
+    const box = boxOverride || TREE_BOUNDS_BY_STAGE[stageIndex];
     if (!box) return;
     const pad = 8;
     svg.setAttribute("viewBox", `${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}`);
@@ -545,14 +554,18 @@
     }
 
     if (typeof window.AlmondTree !== "undefined") {
-      const maxStage = (window.AlmondTree.stages || []).length - 1;
+      // Harvested trees are all fully grown (harvest is only possible at
+      // the final stage), so drawing each at its harvest stage made the whole
+      // forest the same Enchanted-Grove tree. Instead each gets a mature
+      // almond structure plus its own look (blossom, summer, autumn...),
+      // cycling so neighbouring trees always differ.
       shown.forEach((h, i) => {
         const container = document.getElementById(`grove-tree-${i}`);
         if (!container) return;
-        // fall back to the final stage — harvesting is only possible there
-        const stage = h.pointsAtHarvest ? stageIndexForPoints(h.pointsAtHarvest) : maxStage;
-        window.AlmondTree.render(container, stage, false, 1, h.harvestNumber || i + 1);
-        fitTreeToBox(container, stage);
+        const num = h.harvestNumber || i + 1;
+        const look = FOREST_LOOK_ORDER[(num - 1) % FOREST_LOOK_ORDER.length];
+        window.AlmondTree.render(container, FOREST_TREE_STAGE, false, 1, num, look);
+        fitTreeToBox(container, FOREST_TREE_STAGE, FOREST_TREE_BOUNDS);
       });
     }
   }

@@ -4,6 +4,20 @@
   // Seeded random for consistent tree generation per stage
   let randomSeed = 1;
   let currentProgress = 0.5;
+
+  // Forest looks: harvested trees in the background each get one of these
+  // instead of all showing the identical Enchanted-Grove finish. Still
+  // almond trees throughout (Harry's requirement) — just different
+  // seasons/varieties. palette = [shadow, mid, highlight].
+  const LOOKS = {
+    blossom: { palette: ["#2C6A43", "#3E8E5A", "#6FAE80"], flowers: ["#F7B8C4", "#FADADD"], fruit: null },
+    white:   { palette: ["#3A7548", "#56995F", "#94C79A"], flowers: ["#FFFFFF", "#FFF4F6"], fruit: null },
+    spring:  { palette: ["#4A7F33", "#78B04A", "#B6DC7C"], flowers: null, fruit: null },
+    summer:  { palette: ["#1D5535", "#2E7648", "#5C9C6D"], flowers: null, fruit: "#7FA646" },
+    autumn:  { palette: ["#7E3F1A", "#B8672A", "#E5A24F"], flowers: null, fruit: "#8A5A2B" },
+    golden:  { palette: ["#5E6424", "#8E8F35", "#C2B85E"], flowers: null, fruit: "#DAA520" },
+  };
+  let currentLook = null;
   function random() {
     let x = Math.sin(randomSeed++) * 10000;
     return x - Math.floor(x);
@@ -217,13 +231,13 @@
   // spray of randomly-sized overlapping circles — same element budget
   // as before (this used to go up to 6 petals + 1 centre), just a more
   // deliberate arrangement.
-  function drawBlossom(svg, x, y, size) {
+  function drawBlossom(svg, x, y, size, color) {
     const group = createSVGElement('g', {
       class: "tree-blossom",
       style: `transform-origin: ${x}px ${y}px; animation-delay: ${randomRange(0, 2)}s`
     });
 
-    const petalColor = random() > 0.5 ? "#FADADD" : "#F2A49B";
+    const petalColor = color || (random() > 0.5 ? "#FADADD" : "#F2A49B");
     const petals = 5;
     const startAngle = randomRange(0, Math.PI * 2);
 
@@ -338,6 +352,7 @@
   // up-left, and a small light highlight, which is what makes a flat
   // illustration read as round and lit from above.
   function canopyPalette(stageIndex) {
+    if (currentLook) return LOOKS[currentLook].palette;
     // Late stages ripen to a warm olive-gold rather than pure yellow —
     // pure yellow clumps read as balloons, not foliage.
     if (stageIndex >= 7) return ["#5E6424", "#8E8F35", "#C2B85E"];
@@ -376,6 +391,21 @@
   function drawFoliage(svg, x, y, angle, stageIndex, layers) {
     const r = clumpRadius(stageIndex);
     drawClump(layers, x, y, r, stageIndex);
+
+    if (currentLook) {
+      const look = LOOKS[currentLook];
+      if (look.flowers) {
+        const n = 2 + Math.floor(randomRange(0, 2));
+        for (let i = 0; i < n; i++) {
+          drawBlossom(svg, x + randomRange(-r * 0.7, r * 0.7), y + randomRange(-r * 0.7, r * 0.5),
+                      randomRange(2.8, 3.8), look.flowers[i % look.flowers.length]);
+        }
+      }
+      if (look.fruit && random() > 0.5) {
+        drawAlmond(svg, x + randomRange(-6, 6), y + randomRange(0, 6), randomRange(5, 7), look.fruit);
+      }
+      return;
+    }
 
     // Blossom stage: small pink flowers dotted over the canopy, like the mockup.
     if (stageIndex === 4) {
@@ -439,6 +469,7 @@
 
   // --- Main API ---
   window.AlmondTree = {
+    looks: Object.keys(LOOKS),
     stages: [
       { name: "Seed",                need: 0,    description: "A tiny almond nestled in rich soil, a sprout just emerging.", particleType: "soil" },
       { name: "Sapling",             need: 25,   description: "A thin green-brown stem with a few delicate leaves.", particleType: "leaves" },
@@ -458,10 +489,14 @@
 
     // `variant` gives each forest tree its own shape. Without it every tree
     // at the same stage was seeded identically — a row of exact clones.
-    render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0) {
+    // `look` (a key of LOOKS) renders a plain forest tree: that season's
+    // palette/flowers/fruit and none of the magic effects (glow, sparkles),
+    // which belong to the reader's current tree.
+    render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0, look = null) {
       injectStyles();
       containerElement.innerHTML = '';
       currentProgress = progress;
+      currentLook = LOOKS[look] ? look : null;
       
       const svg = createSVGElement('svg', {
         viewBox: "0 0 400 550",
@@ -471,7 +506,7 @@
 
       randomSeed = stageIndex * 1337 + 42 + variant * 7919;
 
-      if (stageIndex >= 7) {
+      if (!currentLook && stageIndex >= 7) {
         const defs = createSVGElement('defs');
         const gradient = createSVGElement('radialGradient', { id: "goldenGlow", cx: "50%", cy: "50%", r: "50%" });
         let opacity = stageIndex >= 8 ? "0.3" : "0";
@@ -592,7 +627,7 @@
           }
         }
 
-        if (stageIndex >= 8) {
+        if (!currentLook && stageIndex >= 8) {
           let baseSparkles = 20;
           if (stageIndex >= 9)  baseSparkles = 25;
           if (stageIndex >= 12) baseSparkles = 40;
