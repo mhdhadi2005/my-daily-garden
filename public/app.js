@@ -84,6 +84,7 @@
 
   // Harvest
   const $harvestSection   = document.getElementById("harvest-section");
+  const $growthReplay     = document.getElementById("growth-replay");
   const $harvestBtn       = document.getElementById("harvest-btn");
   const $harvestOverlay   = document.getElementById("harvest-overlay");
   const $harvestEmoji     = document.getElementById("harvest-emoji");
@@ -169,6 +170,131 @@
     }
 
     currentStage = newStage;
+
+    if (isRealMode) {
+      const replay = takeReplayFor(data);
+      if (replay) await playGrowthReplay(data, replay, requestId);
+      if (requestId === renderRequestId) markViewed();
+    }
+  }
+
+  // ── "Grown since your last visit" replay ──
+  // The server remembers what the reader saw last time (lastView). On their
+  // first load of this page, if the tree has grown since then, we snap back
+  // to that state and grow it forward stage by stage to now.
+  let replayTaken = false;
+  const REPLAY_MAX_MS = 6000;
+
+  function takeReplayFor(data) {
+    if (replayTaken) return null;
+    replayTaken = true;
+    const last = data.lastView;
+    if (!last) return null; // first ever visit — nothing to compare against
+    const harvestedSince = (data.totalHarvests || 0) - (last.totalHarvests || 0);
+    // A harvest resets points, so if trees were harvested since, the
+    // current tree started from a seed after the last visit.
+    const fromPoints = harvestedSince > 0 ? 0 : last.points;
+    if (harvestedSince <= 0 && data.points <= fromPoints) return null; // no growth
+    return { fromPoints, harvestedSince: Math.max(0, harvestedSince), at: last.at };
+  }
+
+  // A snapshot of `data` as it would have looked at `points`.
+  function replayFrame(data, points) {
+    const stages = window.AlmondTree.stages;
+    const idx = stageIndexForPoints(points);
+    const next = stages[idx + 1];
+    return Object.assign({}, data, {
+      points,
+      stage: { index: idx, name: stages[idx].name },
+      nextStage: next ? { name: next.name, pointsNeeded: next.need - points } : null,
+      stageProgress: next ? (points - stages[idx].need) / (next.need - stages[idx].need) : 1,
+      canHarvest: false,
+    });
+  }
+
+  function showFrame(frame) {
+    renderTree(frame, false);
+    sizeCurrentTree(frame.stage.index);
+    renderProgress(frame);
+    updateParticles(frame.stage.index);
+  }
+
+  async function playGrowthReplay(data, replay, requestId) {
+    const stages = window.AlmondTree.stages;
+    const startStage = stageIndexForPoints(replay.fromPoints);
+
+    // Snap back to where they were — same task as the final render that
+    // preceded this, so the browser never paints the final state first.
+    showFrame(replayFrame(data, replay.fromPoints));
+    setValueNow($pointsValue, replay.fromPoints);
+    if ($harvestSection) $harvestSection.style.display = "none";
+    showReplayBanner(data, replay, startStage);
+
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduceMotion) {
+      // One step per stage crossed, then the exact current points.
+      const steps = [];
+      for (let s = startStage + 1; s <= data.stage.index; s++) steps.push(stages[s].need);
+      if (steps[steps.length - 1] !== data.points) steps.push(data.points);
+      const stepMs = Math.max(550, Math.min(1100, REPLAY_MAX_MS / steps.length));
+
+      await sleep(900); // let them see where they were
+      for (const pts of steps) {
+        if (requestId !== renderRequestId) return; // superseded (e.g. demo control clicked)
+        showFrame(replayFrame(data, pts));
+        animateValue($pointsValue, pts);
+        await sleep(stepMs);
+      }
+    }
+    if (requestId !== renderRequestId) return;
+
+    showFrame(data);
+    renderStats(data);
+    renderHarvestButton(data);
+    updateStageSelector(data.stage.index);
+    setTimeout(hideReplayBanner, 4000);
+  }
+
+  function showReplayBanner(data, replay, startStage) {
+    if (!$growthReplay) return;
+    const stages = window.AlmondTree.stages;
+    const gained = data.points - replay.fromPoints;
+    const parts = [];
+    if (gained > 0) parts.push(`<strong>+${gained} points</strong>`);
+    if (data.stage.index !== startStage) parts.push(`${stages[startStage].name} → ${data.stage.name}`);
+    if (replay.harvestedSince > 0) {
+      parts.push(`${replay.harvestedSince} new tree${replay.harvestedSince === 1 ? "" : "s"} in your forest`);
+    }
+    const ago = timeAgo(replay.at);
+    $growthReplay.innerHTML =
+      `<span class="growth-replay-title">Welcome back!</span>` +
+      `<span class="growth-replay-body">Since your last visit${ago ? ` ${ago}` : ""}: ${parts.join(" · ")}</span>`;
+    $growthReplay.hidden = false;
+    $growthReplay.classList.remove("is-leaving");
+  }
+
+  function hideReplayBanner() {
+    if (!$growthReplay || $growthReplay.hidden) return;
+    $growthReplay.classList.add("is-leaving");
+    setTimeout(() => { $growthReplay.hidden = true; }, 600);
+  }
+
+  // SQLite datetime('now') is UTC without a zone marker.
+  function timeAgo(sqliteUtc) {
+    if (!sqliteUtc) return "";
+    const then = Date.parse(sqliteUtc.replace(" ", "T") + "Z");
+    if (isNaN(then)) return "";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 60) return mins <= 1 ? "a minute ago" : `${mins} minutes ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+    const days = Math.round(hours / 24);
+    return days === 1 ? "yesterday" : `${days} days ago`;
+  }
+
+  function markViewed() {
+    fetch(`/api/tree/${encodeURIComponent(realSubscriberId)}/viewed`, { method: "POST" })
+      .catch((err) => console.error("Failed to record visit:", err));
   }
 
   // ── Tree Rendering ──
@@ -202,17 +328,26 @@
     }
   }
 
+  // One running count per element: a new target cancels the old count
+  // instead of two intervals fighting over the same number.
   function animateValue(el, targetValue) {
+    if (!el) return; // embed.html shows only some of the stats
+    clearInterval(el._countTimer);
     const startValue = parseInt(el.textContent) || 0;
     if (startValue === targetValue) { el.textContent = targetValue; return; }
     const duration = 600, steps = 30;
     const increment = (targetValue - startValue) / steps;
     let step = 0;
-    const timer = setInterval(() => {
+    el._countTimer = setInterval(() => {
       step++;
-      if (step >= steps) { el.textContent = targetValue; clearInterval(timer); }
+      if (step >= steps) { el.textContent = targetValue; clearInterval(el._countTimer); }
       else el.textContent = Math.round(startValue + increment * step);
     }, duration / steps);
+  }
+
+  function setValueNow(el, value) {
+    clearInterval(el._countTimer);
+    el.textContent = value;
   }
 
   // ── Progress Bar ──
@@ -356,6 +491,32 @@
     return 0.5 + t * 1.3; // 0.5x (Seed) .. 1.8x (Enchanted Grove) a nominal front tree
   }
 
+  // Layout from the last renderForest, so the current tree can be resized to
+  // a different stage (growth replay) without rebuilding the whole forest.
+  let currentTreeLayout = null;
+
+  // Size/position the current tree for a stage — a Seed reads as a thin new
+  // sprout, an Enchanted Grove tree dominates — clamped so its (very
+  // variable) width never overflows the scene, and grow the scene to fit.
+  // The container's width/height CSS transitions make a stage change here
+  // read as the tree growing, not as a swap.
+  function sizeCurrentTree(stageIndex) {
+    const L = currentTreeLayout;
+    if (!L) return null;
+    const width  = L.frontWidth * currentTreeScale(stageIndex);
+    const box    = TREE_BOUNDS_BY_STAGE[stageIndex];
+    const height = box ? width * (box.height / box.width) : width * 1.37;
+    const centerPx = Math.max(width / 2 + 4, Math.min(L.containerWidth - width / 2 - 4, L.baseCenterPx));
+    const xPercent = (centerPx / L.containerWidth) * 100;
+
+    $treeContainer.style.left = `${xPercent.toFixed(2)}%`;
+    $treeContainer.style.width = `${width.toFixed(0)}px`;
+    $treeContainer.style.height = `${height.toFixed(0)}px`;
+    fitTreeToBox($treeContainer, stageIndex);
+    L.scene.style.height = `${Math.max(200, Math.max(L.forestTop, 8 + height) + 30)}px`;
+    return { xPercent, width, height };
+  }
+
   // A harvested tree completed its whole cycle, so it should be drawn at the
   // stage it reached at harvest — not at whatever stage the current tree is.
   function stageIndexForPoints(points) {
@@ -467,28 +628,18 @@
       sceneTop = Math.max(sceneTop, d.bottom + height);
     });
 
-    // The current tree's slot — sized by its actual stage (a Seed reads as
-    // a thin new sprout, an Enchanted Grove tree dominates), clamped so its
-    // (very variable) width never overflows the scene.
-    const curStageIndex = data.stage.index;
-    const curWidth  = frontWidth * currentTreeScale(curStageIndex);
-    const curBox    = TREE_BOUNDS_BY_STAGE[curStageIndex];
-    const curHeight = curBox ? curWidth * (curBox.height / curBox.width) : curWidth * 1.37;
-    let curCenterPx = m > 0 ? groupStart + spacing * units : containerWidth / 2;
-    curCenterPx = Math.max(curWidth / 2 + 4, Math.min(containerWidth - curWidth / 2 - 4, curCenterPx));
-    const curX = (curCenterPx / containerWidth) * 100;
-
+    // The current tree stands at the front edge of the cluster.
+    currentTreeLayout = {
+      scene,
+      frontWidth,
+      containerWidth,
+      baseCenterPx: m > 0 ? groupStart + spacing * units : containerWidth / 2,
+      forestTop: sceneTop,
+    };
     $treeContainer.classList.add("grove-tree-current");
-    $treeContainer.style.left = `${curX.toFixed(2)}%`;
-    $treeContainer.style.width = `${curWidth.toFixed(0)}px`;
-    $treeContainer.style.height = `${curHeight.toFixed(0)}px`;
     scene.appendChild($treeContainer);
-    fitTreeToBox($treeContainer, curStageIndex);
-
-    treeSlots.push({ xPercent: curX, width: curWidth, height: curHeight, bottom: 8 });
-    sceneTop = Math.max(sceneTop, 8 + curHeight);
-
-    scene.style.height = `${Math.max(200, sceneTop + 30)}px`;
+    const cur = sizeCurrentTree(data.stage.index);
+    treeSlots.push({ xPercent: cur.xPercent, width: cur.width, height: cur.height, bottom: 8 });
 
     // A few grass tufts along the ground band, layered BETWEEN the back and
     // front tree rows (z-index) rather than on top of everything — so front
@@ -583,6 +734,7 @@
 
   // ── Harvest Button ──
   function renderHarvestButton(data) {
+    if (!$harvestSection || !$harvestBtn) return;
     if (data.canHarvest && isRealMode) {
       $harvestSection.style.display = "";
     } else if (data.canHarvest && !isRealMode) {
@@ -597,6 +749,7 @@
   }
 
   function setupHarvestButton() {
+    if (!$harvestBtn || !$harvestContinue) return; // embed.html has no harvest UI
     $harvestBtn.addEventListener("click", async () => {
       if (!isRealMode || !realSubscriberId) return;
       $harvestBtn.disabled = true;
@@ -684,6 +837,20 @@
         fetchAndRender(currentStage >= 0 ? currentStage : 0);
       }, 16);
     });
+
+    // Real readers get the replay automatically; in the demo it's a button,
+    // replaying from 3 stages below whatever stage is selected.
+    const $replayBtn = document.getElementById("demo-replay-btn");
+    if ($replayBtn) {
+      $replayBtn.addEventListener("click", () => {
+        if (!currentData || !window.AlmondTree) return;
+        const stages = window.AlmondTree.stages;
+        const fromPoints = stages[Math.max(0, currentData.stage.index - 3)].need;
+        if (fromPoints >= currentData.points) return;
+        const threeDaysAgo = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 19).replace("T", " ");
+        playGrowthReplay(currentData, { fromPoints, harvestedSince: 0, at: threeDaysAgo }, ++renderRequestId);
+      });
+    }
   }
 
   function updateStageSelector(activeIndex) {

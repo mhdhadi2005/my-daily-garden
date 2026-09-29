@@ -75,7 +75,29 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
     forest:           harvests,
     cosmetics:        cosmeticsEnriched,
     pointValues:      POINT_VALUES,
+    // What they saw last visit, for the "grown since you were last here"
+    // replay. null on a first visit.
+    lastView: sub.last_viewed_at
+      ? { points: sub.last_viewed_points, totalHarvests: sub.last_viewed_harvests, at: sub.last_viewed_at }
+      : null,
   });
+});
+
+// POST /api/tree/:beehiivSubscriberId/viewed
+// Called by the page once the reader has seen their current tree (after any
+// growth replay has played). Snapshots current state as the new baseline.
+// Kept separate from the GET so reloads/refetches can't silently consume a
+// replay the reader never actually watched.
+router.post("/api/tree/:beehiivSubscriberId/viewed", (req, res) => {
+  const result = db
+    .prepare(`UPDATE subscribers
+                 SET last_viewed_points = points,
+                     last_viewed_harvests = total_harvests,
+                     last_viewed_at = datetime('now')
+               WHERE beehiiv_subscriber_id = ?`)
+    .run(req.params.beehiivSubscriberId);
+  if (!result.changes) return res.status(404).json({ error: "subscriber not found" });
+  res.status(204).end();
 });
 
 

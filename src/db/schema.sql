@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS subscribers (
   last_engaged_date   TEXT,                 -- 'YYYY-MM-DD', last day with >=1 qualifying click
   total_engaged_days   INTEGER NOT NULL DEFAULT 0,
   referrals_credited  INTEGER NOT NULL DEFAULT 0, -- how many referrals we've already paid points for
+  last_viewed_points  INTEGER,              -- snapshot at last tree-page visit (growth replay); NULL = never viewed
+  last_viewed_harvests INTEGER,
+  last_viewed_at      TEXT,
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

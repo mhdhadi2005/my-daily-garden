@@ -372,8 +372,20 @@ body {
 /* ── Tree Container: the current tree's slot inside the shared grove scene
    (see renderForest in app.js) — not a standalone hero box. Width/height/
    left are all set per-render in JS from the tree's actual stage shape. ── */
+/* Standalone (e.g. embed.html, which has no forest scene): a plain centred box. */
 .tree-container {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 400 / 500;
+  margin: 0 auto 12px;
+}
+
+.grove-scene .tree-container {
   position: absolute;
+  max-width: none;
+  aspect-ratio: auto;
+  margin: 0;
   bottom: 8px;
   transform: translateX(-50%);
   z-index: 4; /* above regular grove trees (3), below perched props (5) */
@@ -663,6 +675,70 @@ body {
 }
 
 /* ── Stage Selector (Demo) ── */
+/* ── "Grown since your last visit" banner ── */
+.growth-replay {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 4px auto 8px;
+  padding: 10px 18px;
+  max-width: 440px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
+  box-shadow: 0 4px 18px rgba(38, 42, 69, 0.12);
+  animation: replayIn 0.5s var(--ease-out) both;
+}
+/* display:flex above would otherwise override the `hidden` attribute */
+.growth-replay[hidden] {
+  display: none;
+}
+.growth-replay.is-leaving {
+  animation: replayOut 0.6s var(--ease-out) both;
+}
+.growth-replay-title {
+  font-family: 'Bowlby One SC', cursive;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+.growth-replay-body {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.growth-replay-body strong {
+  color: #C77D14;
+}
+@keyframes replayIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes replayOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-8px); }
+}
+
+.demo-replay-btn {
+  margin-top: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--gold);
+  border: none;
+  border-radius: 100px;
+  cursor: pointer;
+}
+.demo-replay-btn:hover {
+  filter: brightness(1.05);
+}
+
 .demo-controls {
   width: 100%;
   max-width: 380px;
@@ -862,8 +938,8 @@ body {
 /* The tree container is centred on its slot via translateX(-50%); the
    generic fade transforms above would replace that and make it jump
    sideways by half its width for the length of the transition. */
-.tree-container.fade-out { transform: translateX(-50%) scale(0.95); }
-.tree-container.fade-in  { transform: translateX(-50%) scale(1); }
+.grove-scene .tree-container.fade-out { transform: translateX(-50%) scale(0.95); }
+.grove-scene .tree-container.fade-in  { transform: translateX(-50%) scale(1); }
 
 /* ── Tree SVG Animations (injected by tree-stages.js) ── */
 @keyframes sway {

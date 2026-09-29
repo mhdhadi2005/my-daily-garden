@@ -30,6 +30,9 @@
       <p class="stage-description" id="stage-description"></p>
     </div>
 
+    <!-- "Grown since your last visit" banner, shown during the growth replay -->
+    <div class="growth-replay" id="growth-replay" role="status" aria-live="polite" hidden></div>
+
     <!-- Unified Garden Scene: main tree (hero) + forest shelf of past harvests + critters -->
     <div class="garden-scene" id="garden-scene">
       <!-- Main growing tree (hero, always shown) -->
@@ -207,6 +210,12 @@
             <span id="demo-harvests-count">0</span> harvested
           </label>
         </div>
+      </div>
+
+      <div class="demo-control-block">
+        <div class="demo-control-title">3. Coming back after a few days</div>
+        <p class="demo-control-hint">Real readers see this automatically: their tree grows from where it was on their last visit to where it is now.</p>
+        <button type="button" class="demo-replay-btn" id="demo-replay-btn">Play "since your last visit"</button>
       </div>
     </div>
 

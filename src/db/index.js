@@ -38,6 +38,11 @@ const db = {
 // explicit ALTER that's safe to run on every boot.
 const ADDED_COLUMNS = [
   ["subscribers", "referrals_credited", "INTEGER NOT NULL DEFAULT 0"],
+  // Snapshot of what the reader saw on their last visit, so the page can
+  // replay how much the tree grew since then. NULL until their first view.
+  ["subscribers", "last_viewed_points", "INTEGER"],
+  ["subscribers", "last_viewed_harvests", "INTEGER"],
+  ["subscribers", "last_viewed_at", "TEXT"],
 ];
 
 function initSchema() {
