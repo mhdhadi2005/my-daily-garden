@@ -223,11 +223,16 @@
     const stages = window.AlmondTree.stages;
     const startStage = stageIndexForPoints(replay.fromPoints);
 
+    // Hold the scene at its final (largest) height for the whole replay.
+    if (currentTreeLayout) currentTreeLayout.lockedSceneHeight = sceneHeightFor(data.stage.index);
+
     // Snap back to where they were — same task as the final render that
     // preceded this, so the browser never paints the final state first.
     showFrame(replayFrame(data, replay.fromPoints));
     setValueNow($pointsValue, replay.fromPoints);
-    if ($harvestSection) $harvestSection.style.display = "none";
+    // Not earned yet at the replay's starting point — but hide it without
+    // collapsing its space, or everything below jumps twice.
+    if ($harvestSection) $harvestSection.style.visibility = "hidden";
     showReplayBanner(data, replay, startStage);
 
     const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -248,6 +253,7 @@
     }
     if (requestId !== renderRequestId) return;
 
+    if (currentTreeLayout) currentTreeLayout.lockedSceneHeight = 0;
     showFrame(data);
     renderStats(data);
     renderHarvestButton(data);
@@ -478,17 +484,17 @@
     svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
   }
 
-  // How big the current tree's slot is relative to a nominal grove tree,
-  // by stage — a Seed should look like a thin new sprout next to the
-  // grown forest, an Enchanted Grove tree should dominate it. Built from
-  // TREE_BOUNDS_BY_STAGE's real measured heights rather than a guessed
-  // curve, so it tracks whatever the renderer's actual geometry is.
-  function currentTreeScale(stageIndex) {
-    const box  = TREE_BOUNDS_BY_STAGE[stageIndex];
-    const minH = TREE_BOUNDS_BY_STAGE[0].height;
-    const maxH = TREE_BOUNDS_BY_STAGE[TREE_BOUNDS_BY_STAGE.length - 1].height;
-    const t = Math.max(0, Math.min(1, (box.height - minH) / (maxH - minH)));
-    return 0.5 + t * 1.3; // 0.5x (Seed) .. 1.8x (Enchanted Grove) a nominal front tree
+  // Height of the current tree's slot, relative to a nominal front grove
+  // tree, by stage — a Seed reads as a thin new sprout next to the grown
+  // forest, an Enchanted Grove tree dominates it. Driven by the stage number
+  // so it strictly increases: deriving it from each stage's measured bounds
+  // (the old approach) made the tree SHRINK between some stages, since later
+  // stages are often wider but squatter — visible as the tree getting
+  // smaller mid-way through the growth replay.
+  function currentTreeHeightScale(stageIndex) {
+    const last = TREE_BOUNDS_BY_STAGE.length - 1;
+    const t = Math.max(0, Math.min(1, stageIndex / last));
+    return 0.45 + 1.35 * Math.pow(t, 0.8); // 0.45x (Seed) .. 1.8x (Enchanted Grove)
   }
 
   // Layout from the last renderForest, so the current tree can be resized to
@@ -500,12 +506,23 @@
   // variable) width never overflows the scene, and grow the scene to fit.
   // The container's width/height CSS transitions make a stage change here
   // read as the tree growing, not as a swap.
+  function currentTreeSize(stageIndex) {
+    const L = currentTreeLayout;
+    const box    = TREE_BOUNDS_BY_STAGE[stageIndex];
+    const height = L.frontWidth * 1.37 * currentTreeHeightScale(stageIndex);
+    const width  = Math.min(L.containerWidth - 8, box ? height * (box.width / box.height) : height / 1.37);
+    return { width, height };
+  }
+
+  function sceneHeightFor(stageIndex) {
+    const L = currentTreeLayout;
+    return Math.max(200, Math.max(L.forestTop, 8 + currentTreeSize(stageIndex).height) + 30);
+  }
+
   function sizeCurrentTree(stageIndex) {
     const L = currentTreeLayout;
     if (!L) return null;
-    const width  = L.frontWidth * currentTreeScale(stageIndex);
-    const box    = TREE_BOUNDS_BY_STAGE[stageIndex];
-    const height = box ? width * (box.height / box.width) : width * 1.37;
+    const { width, height } = currentTreeSize(stageIndex);
     const centerPx = Math.max(width / 2 + 4, Math.min(L.containerWidth - width / 2 - 4, L.baseCenterPx));
     const xPercent = (centerPx / L.containerWidth) * 100;
 
@@ -513,7 +530,9 @@
     $treeContainer.style.width = `${width.toFixed(0)}px`;
     $treeContainer.style.height = `${height.toFixed(0)}px`;
     fitTreeToBox($treeContainer, stageIndex);
-    L.scene.style.height = `${Math.max(200, Math.max(L.forestTop, 8 + height) + 30)}px`;
+    // During a growth replay the scene is held at its final height, so the
+    // progress bar and everything below it don't move as the tree grows.
+    L.scene.style.height = `${Math.max(sceneHeightFor(stageIndex), L.lockedSceneHeight || 0)}px`;
     return { xPercent, width, height };
   }
 
@@ -735,6 +754,7 @@
   // ── Harvest Button ──
   function renderHarvestButton(data) {
     if (!$harvestSection || !$harvestBtn) return;
+    $harvestSection.style.visibility = ""; // undo the growth replay's temporary hide
     if (data.canHarvest && isRealMode) {
       $harvestSection.style.display = "";
     } else if (data.canHarvest && !isRealMode) {
