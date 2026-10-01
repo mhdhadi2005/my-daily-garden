@@ -315,7 +315,8 @@
     const stageData = window.AlmondTree.stages[data.stage.index];
     $stageName.textContent = data.stage.name;
     $stageDescription.textContent = stageData ? stageData.description : "";
-    window.AlmondTree.render($treeContainer, data.stage.index, animate, data.stageProgress || 0.5);
+    const num = currentTreeNumber(data);
+    window.AlmondTree.render($treeContainer, data.stage.index, animate, data.stageProgress || 0.5, num, treeLook(num));
   }
 
   // ── Stats Rendering ──
@@ -459,14 +460,46 @@
     { x: -14.7, y: -107.2, width: 471.0, height: 640.9 },
   ];
 
-  // Forest (harvested) trees: a mature almond structure with a seasonal look
-  // and no magic effects — see renderForest. Bounds measured the same way
-  // as TREE_BOUNDS_BY_STAGE, for that stage rendered with a look.
-  const FOREST_TREE_STAGE = 8;
-  const FOREST_LOOK_ORDER = ["blossom", "summer", "autumn", "white", "spring", "golden"];
-  // Typical box (widths measured 372–442 across looks/variants); the widest
-  // shapes spill slightly rather than shrinking every tree to fit them.
-  const FOREST_TREE_BOUNDS = { x: -12, y: -24, width: 424, height: 552 };
+  // Every tree has an identity for its whole life: tree #N (the Nth tree a
+  // reader grows) always has look TREE_LOOK_ORDER[N-1] and branch shape N.
+  // So the tree you grow is the tree you harvest — it doesn't turn into a
+  // different tree when it joins the forest. Order follows Harry's examples
+  // (green, brown, light green, dark green...); #1 is the classic almond.
+  const TREE_LOOK_ORDER = ["blossom", "autumn", "spring", "summer", "white", "golden"];
+  function treeLook(treeNumber) {
+    return TREE_LOOK_ORDER[(treeNumber - 1) % TREE_LOOK_ORDER.length];
+  }
+  function currentTreeNumber(data) {
+    return (data.totalHarvests || 0) + 1;
+  }
+
+  // Each look's own little animation over its tree: drifting petals for
+  // the blossom trees, falling leaves for the brown one, butterflies, fire-
+  // flies, sparkles. Positions/timings come from the tree number, so a
+  // tree's effect is stable across re-renders rather than reshuffling.
+  const TREE_FX_COUNT = { blossom: 5, white: 5, autumn: 5, spring: 2, summer: 5, golden: 6 };
+  function createTreeFx(look, treeNumber) {
+    const fx = document.createElement("div");
+    fx.className = `tree-fx fx-${look}`;
+    const count = TREE_FX_COUNT[look] || 0;
+    for (let p = 0; p < count; p++) {
+      const seed = treeNumber * 31 + p * 17;
+      const s = document.createElement("span");
+      s.style.cssText =
+        `left:${12 + (seed % 72)}%; top:${10 + ((seed * 7) % 38)}%;` +
+        `animation-delay:-${((seed % 60) / 10).toFixed(1)}s; animation-duration:${(5 + (seed % 5) * 0.7).toFixed(1)}s`;
+      if (look === "spring" && window.Art) s.innerHTML = window.Art.badge("butterfly", 16);
+      fx.appendChild(s);
+    }
+    return fx;
+  }
+
+  // Harvested trees stay the Enchanted Grove tree the reader grew (compact
+  // render — see AlmondTree.render). Bounds measured for that render across
+  // looks/variants; the widest shapes spill slightly rather than shrinking
+  // every tree to fit them.
+  const FOREST_TREE_STAGE = 13;
+  const FOREST_TREE_BOUNDS = { x: -64.4, y: -90.5, width: 518.5, height: 637.6 }; // median across looks; widths 500–595
 
   function fitTreeToBox(container, stageIndex, boxOverride) {
     const svg = container.querySelector("svg");
@@ -589,34 +622,27 @@
     const n = shown.length + 1; // +1 for the current tree's own slot
     const m = shown.length;
 
-    // One layered cluster, not a queue. Each harvested tree gets a depth
-    // row — front, middle or back (smaller, higher, hazier) — chosen so
-    // neighbours differ, plus a small size/position jitter from its harvest
-    // number, and they overlap heavily. With its own branch shape (the
-    // `variant` passed to render below) that reads as one continuous
-    // forest rather than a row of identical clones. The cluster is kept
-    // compact and centred (spreading trees across the full width was an
-    // earlier bug: two trees ended up at opposite edges) and only tightens
-    // when it would overflow. The current tree stands at its front edge.
+    // The tree you're growing now is the focal point, in the middle; the
+    // trees you've harvested stand around it — alternating left and right,
+    // working outward, most recent closest. Each ring sits in a depth row
+    // (front / middle / back: smaller, higher, hazier) that differs from
+    // its neighbours, with a little size/position jitter, so the whole thing
+    // reads as one forest around your tree rather than a queue.
     const containerWidth = $gardenBackdrop.clientWidth || 380;
+    const half = containerWidth / 2;
     const DEPTHS = [
       { cls: "is-front", scale: 1.0,  bottom: 8,  z: 3 },
       { cls: "is-mid",   scale: 0.8,  bottom: 30, z: 2 },
       { cls: "is-back",  scale: 0.62, bottom: 52, z: 1 },
     ];
-    const DEPTH_PATTERN = [0, 2, 1, 2, 0, 1];
-    const CURRENT_GAP = 1.4; // the current tree stands a little apart, in front
-
-    let frontWidth = 120;
-    let spacing = frontWidth * 0.5;
-    const units = Math.max(0, m - 1) + (m > 0 ? CURRENT_GAP : 0);
-    const maxSpan = containerWidth * 0.78;
-    if (spacing * units > maxSpan) {
-      const k = maxSpan / (spacing * units);
-      spacing *= k;
-      frontWidth = Math.max(60, frontWidth * Math.max(k, 0.55));
-    }
-    const groupStart = (containerWidth - spacing * units) / 2;
+    const DEPTH_BY_RING = [1, 0, 2, 0, 1]; // ring 1 flanks your tree from just behind it
+    // Rings overlap heavily — neighbouring rings are in different depth
+    // rows, so they layer rather than merge — which keeps trees big enough
+    // to read individually even with a full forest.
+    const FIRST_RING = 0.6, RING_STEP = 0.42; // offsets from the middle, in front-tree widths
+    const perSide = Math.ceil(m / 2);
+    const reach = FIRST_RING + RING_STEP * Math.max(0, perSide - 1);
+    const frontWidth = Math.max(70, Math.min(120, (half * 0.9) / Math.max(reach, 1)));
 
     const treeSlots = []; // {xPercent, width, height, bottom} — reused below to anchor critters to a real tree
     let sceneTop = 0; // tallest point above the ground, to size the scene
@@ -624,35 +650,49 @@
     shown.forEach((h, i) => {
       const num = h.harvestNumber || i + 1;
       const pts = h.pointsAtHarvest || 0;
-      const d = DEPTHS[DEPTH_PATTERN[i % DEPTH_PATTERN.length]];
-      const sizeJitter = 0.9 + ((num * 37) % 21) / 100;           // 0.90 – 1.10
-      const xJitter = (((num * 53) % 17) - 8) * (spacing / 60);    // a few px either way
+      const k = m - 1 - i;                  // 0 = most recently harvested
+      const side = k % 2 === 0 ? -1 : 1;
+      const ring = Math.floor(k / 2) + 1;
+      const d = DEPTHS[DEPTH_BY_RING[(ring - 1) % DEPTH_BY_RING.length]];
+      const sizeJitter = 0.9 + ((num * 37) % 21) / 100;            // 0.90 – 1.10
+      const xJitter = (((num * 53) % 17) - 8) * (frontWidth / 120); // a few px either way
       const width = frontWidth * d.scale * sizeJitter;
       const height = width * 1.37;
-      const centerPx = groupStart + spacing * i + xJitter;
+      const offset = (FIRST_RING + RING_STEP * (ring - 1)) * frontWidth;
+      const centerPx = Math.max(width / 2, Math.min(containerWidth - width / 2, half + side * offset + xJitter));
       const x = (centerPx / containerWidth) * 100;
+      const look = treeLook(num);
 
       const slot = document.createElement("div");
       slot.className = `grove-tree ${d.cls}`;
-      slot.style.cssText = `left:${x.toFixed(2)}%; bottom:${d.bottom}px; z-index:${d.z}; width:${width.toFixed(0)}px; height:${height.toFixed(0)}px; --d:${(i * 0.06).toFixed(2)}s`;
+      slot.style.cssText = `left:${x.toFixed(2)}%; bottom:${d.bottom}px; z-index:${d.z}; width:${width.toFixed(0)}px; height:${height.toFixed(0)}px; --d:${(k * 0.06).toFixed(2)}s`;
       slot.title = `Tree #${num} — harvested at ${pts} pts`;
 
+      // Each tree sways at its own pace, and carries a small effect that
+      // matches its look (falling petals, autumn leaves, sparkles...). Both
+      // are CSS animations on plain HTML elements — composited, so no SVG
+      // repaints, unlike animating inside the tree's SVG (which is what
+      // lagged the page when every tree did it).
       const art = document.createElement("div");
       art.className = "grove-tree-art";
       art.id = `grove-tree-${i}`;
+      art.style.cssText = `--sway-dur:${(6 + (num % 4)).toFixed(1)}s; --sway-delay:-${(num * 1.3) % 6}s`;
       slot.appendChild(art);
+      slot.appendChild(createTreeFx(look, num));
       scene.appendChild(slot);
 
       treeSlots.push({ xPercent: x, width, height, bottom: d.bottom });
       sceneTop = Math.max(sceneTop, d.bottom + height);
     });
 
-    // The current tree stands at the front edge of the cluster.
+    // Your current tree: centred, in front. Sized off a fixed base rather
+    // than the forest's (shrinking) front-tree width, so the focal tree
+    // doesn't get smaller as the forest around it grows.
     currentTreeLayout = {
       scene,
-      frontWidth,
+      frontWidth: Math.min(115, containerWidth * 0.3),
       containerWidth,
-      baseCenterPx: m > 0 ? groupStart + spacing * units : containerWidth / 2,
+      baseCenterPx: half,
       forestTop: sceneTop,
     };
     $treeContainer.classList.add("grove-tree-current");
@@ -712,7 +752,12 @@
         prop.style.cssText = `left:${x.toFixed(2)}%; --d:${(0.3 + i * 0.08).toFixed(2)}s`;
       }
 
-      prop.innerHTML = window.Art.critter(c.type, isPerched ? 32 : 40);
+      // Bigger than before, and alive: each critter idles (hops, bobs) on a
+      // composited wrapper, staggered so they don't move in unison.
+      const size = isPerched ? 44 : 56;
+      prop.innerHTML =
+        `<div class="critter-idle critter-${c.type}" style="animation-delay:-${((i * 0.9) % 3).toFixed(1)}s">` +
+        window.Art.critter(c.type, size) + `</div>`;
       scene.appendChild(prop);
     });
 
@@ -724,17 +769,13 @@
     }
 
     if (typeof window.AlmondTree !== "undefined") {
-      // Harvested trees are all fully grown (harvest is only possible at
-      // the final stage), so drawing each at its harvest stage made the whole
-      // forest the same Enchanted-Grove tree. Instead each gets a mature
-      // almond structure plus its own look (blossom, summer, autumn...),
-      // cycling so neighbouring trees always differ.
+      // A harvested tree is the same tree the reader grew — same look, same
+      // shape — still in its Enchanted Grove glory, not a plain stand-in.
       shown.forEach((h, i) => {
         const container = document.getElementById(`grove-tree-${i}`);
         if (!container) return;
         const num = h.harvestNumber || i + 1;
-        const look = FOREST_LOOK_ORDER[(num - 1) % FOREST_LOOK_ORDER.length];
-        window.AlmondTree.render(container, FOREST_TREE_STAGE, false, 1, num, look);
+        window.AlmondTree.render(container, FOREST_TREE_STAGE, false, 1, num, treeLook(num), { compact: true });
         fitTreeToBox(container, FOREST_TREE_STAGE, FOREST_TREE_BOUNDS);
       });
     }
@@ -755,23 +796,45 @@
   function renderHarvestButton(data) {
     if (!$harvestSection || !$harvestBtn) return;
     $harvestSection.style.visibility = ""; // undo the growth replay's temporary hide
-    if (data.canHarvest && isRealMode) {
+    if (data.canHarvest) {
       $harvestSection.style.display = "";
-    } else if (data.canHarvest && !isRealMode) {
-      // Demo: show but disabled with note
-      $harvestSection.style.display = "";
-      $harvestBtn.disabled = true;
-      $harvestBtn.title = "Harvesting requires a real subscriber link";
-      $harvestBtn.textContent = "🌾 Harvest Your Tree (demo)";
+      $harvestBtn.disabled = false;
+      $harvestBtn.textContent = "Harvest Your Tree";
     } else {
       $harvestSection.style.display = "none";
     }
   }
 
+  // Demo harvest: no subscriber to save to, so it's simulated client-side —
+  // the tree joins the demo forest (same look it was grown in), the
+  // celebration plays, and the next tree starts from a seed. Cosmetic
+  // matches what the demo API hands out for that harvest number.
+  const DEMO_HARVEST_COSMETICS = [
+    { type: "bunny", label: "Bunny", rarity: "common" },
+    { type: "fox", label: "Fox", rarity: "common" },
+    { type: "gnome_house", label: "Gnome House", rarity: "common" },
+    { type: "hedgehog", label: "Hedgehog", rarity: "uncommon" },
+    { type: "wildflowers", label: "Wildflowers", rarity: "common" },
+    { type: "owl", label: "Owl", rarity: "uncommon" },
+    { type: "deer", label: "Deer", rarity: "rare" },
+    { type: "fairy_lantern", label: "Fairy Lantern", rarity: "rare" },
+  ];
+  function demoHarvest() {
+    const harvestNumber = demoHarvests + 1;
+    demoHarvests = Math.min(harvestNumber, parseInt($demoHarvestsSlider.max, 10));
+    $demoHarvestsSlider.value = demoHarvests;
+    $demoHarvestsCount.textContent = demoHarvests;
+    showHarvestCelebration({
+      harvestNumber,
+      cosmeticEarned: DEMO_HARVEST_COSMETICS[(harvestNumber - 1) % DEMO_HARVEST_COSMETICS.length],
+    });
+  }
+
   function setupHarvestButton() {
     if (!$harvestBtn || !$harvestContinue) return; // embed.html has no harvest UI
     $harvestBtn.addEventListener("click", async () => {
-      if (!isRealMode || !realSubscriberId) return;
+      if (!isRealMode) { demoHarvest(); return; }
+      if (!realSubscriberId) return;
       $harvestBtn.disabled = true;
       $harvestBtn.textContent = "Harvesting…";
 
@@ -783,7 +846,7 @@
       } catch (err) {
         console.error("Harvest failed:", err);
         $harvestBtn.disabled = false;
-        $harvestBtn.textContent = "🌾 Harvest Your Tree";
+        $harvestBtn.textContent = "Harvest Your Tree";
         alert("Oops — something went wrong. Please try again!");
       }
     });

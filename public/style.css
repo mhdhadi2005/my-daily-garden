@@ -276,12 +276,12 @@ body {
   filter: none;
 }
 
-/* Harvested trees are still life. Every blossom, almond, sparkle and
-   butterfly in a tree carries its own infinite CSS animation — with a
-   full forest that was ~1,800 animations repainting SVG every frame, which
-   froze the page and made the stage dots feel unclickable. Only the
-   current tree animates now. Falling petals/leaves are hidden rather than
-   frozen mid-air. */
+/* Nothing animates INSIDE a harvested tree's SVG. Every blossom, almond,
+   sparkle and butterfly in a tree carries its own infinite CSS animation —
+   with a full forest that was ~1,800 animations repainting SVG every frame,
+   which froze the page and made the stage dots feel unclickable. Harvested
+   trees get their life from the composited sway + effects layer instead
+   (see .grove-tree-art and .tree-fx). */
 .grove-tree-art * {
   animation: none !important;
 }
@@ -305,6 +305,95 @@ body {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Each harvested tree sways gently at its own pace (duration/delay set
+   per tree in JS). Rotating the whole tree's box is composited — the SVG
+   inside isn't repainted — so a full forest of swaying trees stays cheap. */
+.grove-tree-art {
+  transform-origin: 50% 100%;
+  animation: treeSway var(--sway-dur, 7s) ease-in-out infinite alternate;
+  animation-delay: var(--sway-delay, 0s);
+}
+@keyframes treeSway {
+  from { transform: rotate(-0.9deg); }
+  to   { transform: rotate(0.9deg); }
+}
+
+/* Per-look effects over each harvested tree (see createTreeFx). Plain
+   HTML particles moved with transform/opacity only: composited. */
+.tree-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.tree-fx span {
+  position: absolute;
+  display: block;
+  line-height: 0;
+  animation: fxFall 6s linear infinite;
+}
+.fx-blossom span, .fx-white span, .fx-autumn span {
+  width: 6px;
+  height: 5px;
+  border-radius: 70% 0 70% 0;
+}
+.fx-blossom span { background: #F7B8C4; }
+.fx-white span   { background: #FFFFFF; box-shadow: 0 0 1px rgba(38, 42, 69, 0.25); }
+.fx-autumn span  { background: #C0702A; width: 7px; }
+.fx-golden span, .fx-summer span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  animation-name: fxTwinkle;
+  animation-timing-function: ease-in-out;
+}
+.fx-golden span { background: #FFE38A; box-shadow: 0 0 6px 2px rgba(255, 210, 80, 0.7); }
+.fx-summer span { background: #E9FF9A; box-shadow: 0 0 6px 2px rgba(200, 255, 120, 0.6); animation-name: fxFirefly; }
+.fx-spring span { animation-name: fxFlutter; animation-timing-function: ease-in-out; }
+
+@keyframes fxFall {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translate(16px, 110px) rotate(300deg); opacity: 0; }
+}
+@keyframes fxTwinkle {
+  0%, 100% { transform: scale(0.4); opacity: 0.2; }
+  50%      { transform: scale(1.2); opacity: 1; }
+}
+@keyframes fxFirefly {
+  0%, 100% { transform: translate(0, 0); opacity: 0.2; }
+  30%      { transform: translate(8px, -6px); opacity: 1; }
+  60%      { transform: translate(-6px, -12px); opacity: 0.8; }
+}
+@keyframes fxFlutter {
+  0%, 100% { transform: translate(0, 0) scaleX(1); }
+  25%      { transform: translate(14px, -10px) scaleX(0.6); }
+  50%      { transform: translate(24px, 2px) scaleX(1); }
+  75%      { transform: translate(10px, 8px) scaleX(0.6); }
+}
+
+/* Critters idle so the forest feels alive: four-legged animals hop, the
+   rest bob gently. On a wrapper, so it doesn't fight .grove-prop's own
+   entrance transform. */
+.critter-idle {
+  animation: critterBob 2.8s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.critter-bunny, .critter-fox, .critter-deer, .critter-hedgehog {
+  animation: critterHop 3.4s ease-in-out infinite;
+}
+@keyframes critterBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@keyframes critterHop {
+  0%, 70%, 100% { transform: translateY(0) scale(1, 1); }
+  76%           { transform: translateY(0) scale(1.06, 0.92); }
+  84%           { transform: translateY(-9px) scale(0.96, 1.05); }
+  92%           { transform: translateY(0) scale(1.04, 0.95); }
 }
 
 /* Each forest tree has its own shape (render `variant`), but the box is

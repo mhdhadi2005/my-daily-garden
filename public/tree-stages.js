@@ -5,19 +5,22 @@
   let randomSeed = 1;
   let currentProgress = 0.5;
 
-  // Forest looks: harvested trees in the background each get one of these
-  // instead of all showing the identical Enchanted-Grove finish. Still
-  // almond trees throughout (Harry's requirement) — just different
-  // seasons/varieties. palette = [shadow, mid, highlight].
+  // Tree looks: each tree a reader grows has one of these for its whole
+  // life — seed to Enchanted Grove to its place in the forest — so every
+  // tree is recognisably different. Still almond trees throughout (Harry's
+  // requirement), just different varieties. palette = [shadow, mid, highlight].
   const LOOKS = {
-    blossom: { palette: ["#2C6A43", "#3E8E5A", "#6FAE80"], flowers: ["#F7B8C4", "#FADADD"], fruit: null },
-    white:   { palette: ["#3A7548", "#56995F", "#94C79A"], flowers: ["#FFFFFF", "#FFF4F6"], fruit: null },
-    spring:  { palette: ["#4A7F33", "#78B04A", "#B6DC7C"], flowers: null, fruit: null },
-    summer:  { palette: ["#1D5535", "#2E7648", "#5C9C6D"], flowers: null, fruit: "#7FA646" },
-    autumn:  { palette: ["#7E3F1A", "#B8672A", "#E5A24F"], flowers: null, fruit: "#8A5A2B" },
-    golden:  { palette: ["#5E6424", "#8E8F35", "#C2B85E"], flowers: null, fruit: "#DAA520" },
+    blossom: { palette: ["#2C6A43", "#3E8E5A", "#6FAE80"], flowers: ["#F7B8C4", "#FADADD"] },
+    white:   { palette: ["#3A7548", "#56995F", "#94C79A"], flowers: ["#FFFFFF", "#FFF4F6"] },
+    spring:  { palette: ["#4A7F33", "#78B04A", "#B6DC7C"], flowers: null },
+    summer:  { palette: ["#1D5535", "#2E7648", "#5C9C6D"], flowers: null },
+    autumn:  { palette: ["#7E3F1A", "#B8672A", "#E5A24F"], flowers: null },
+    golden:  { palette: ["#5E6424", "#8E8F35", "#C2B85E"], flowers: null },
   };
   let currentLook = null;
+  // Harvested trees in the forest: the full grown tree, minus the extras
+  // that only make sense once on screen (rainbow, glow, companion saplings).
+  let compactMode = false;
   function random() {
     let x = Math.sin(randomSeed++) * 10000;
     return x - Math.floor(x);
@@ -392,19 +395,18 @@
     const r = clumpRadius(stageIndex);
     drawClump(layers, x, y, r, stageIndex);
 
-    if (currentLook) {
-      const look = LOOKS[currentLook];
-      if (look.flowers) {
-        const n = 2 + Math.floor(randomRange(0, 2));
-        for (let i = 0; i < n; i++) {
-          drawBlossom(svg, x + randomRange(-r * 0.7, r * 0.7), y + randomRange(-r * 0.7, r * 0.5),
-                      randomRange(2.8, 3.8), look.flowers[i % look.flowers.length]);
-        }
+    // A tree's look (its colours) applies through every stage via
+    // canopyPalette; the stage's own story below (blossoms at Blossom,
+    // almonds ripening later) still plays out. Flowering looks also keep
+    // their flowers once the tree is grown, so each mature tree stays
+    // recognisably itself.
+    if (currentLook && stageIndex >= 8 && LOOKS[currentLook].flowers) {
+      const flowers = LOOKS[currentLook].flowers;
+      const n = 2 + Math.floor(randomRange(0, 2));
+      for (let i = 0; i < n; i++) {
+        drawBlossom(svg, x + randomRange(-r * 0.7, r * 0.7), y + randomRange(-r * 0.7, r * 0.5),
+                    randomRange(2.8, 3.8), flowers[i % flowers.length]);
       }
-      if (look.fruit && random() > 0.5) {
-        drawAlmond(svg, x + randomRange(-6, 6), y + randomRange(0, 6), randomRange(5, 7), look.fruit);
-      }
-      return;
     }
 
     // Blossom stage: small pink flowers dotted over the canopy, like the mockup.
@@ -487,16 +489,17 @@
       { name: "Enchanted Grove",     need: 1960, description: "A magical grove of almond trees bathed in eternal golden light.", particleType: "sparkles" }
     ],
 
-    // `variant` gives each forest tree its own shape. Without it every tree
-    // at the same stage was seeded identically — a row of exact clones.
-    // `look` (a key of LOOKS) renders a plain forest tree: that season's
-    // palette/flowers/fruit and none of the magic effects (glow, sparkles),
-    // which belong to the reader's current tree.
-    render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0, look = null) {
+    // `variant` gives each tree its own branch shape and `look` (a key of
+    // LOOKS) its colours — both fixed per tree, so a tree looks like itself
+    // at every stage and after it's harvested. `opts.compact` is for
+    // harvested trees in the forest: the full grown tree minus the
+    // once-per-screen extras (rainbow, glow, companion saplings).
+    render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0, look = null, opts = {}) {
       injectStyles();
       containerElement.innerHTML = '';
       currentProgress = progress;
       currentLook = LOOKS[look] ? look : null;
+      compactMode = !!opts.compact;
       
       const svg = createSVGElement('svg', {
         viewBox: "0 0 400 550",
@@ -506,7 +509,7 @@
 
       randomSeed = stageIndex * 1337 + 42 + variant * 7919;
 
-      if (!currentLook && stageIndex >= 7) {
+      if (!compactMode && stageIndex >= 7) {
         const defs = createSVGElement('defs');
         const gradient = createSVGElement('radialGradient', { id: "goldenGlow", cx: "50%", cy: "50%", r: "50%" });
         let opacity = stageIndex >= 8 ? "0.3" : "0";
@@ -627,12 +630,13 @@
           }
         }
 
-        if (!currentLook && stageIndex >= 8) {
+        if (stageIndex >= 8) {
           let baseSparkles = 20;
           if (stageIndex >= 9)  baseSparkles = 25;
           if (stageIndex >= 12) baseSparkles = 40;
           if (stageIndex >= 13) baseSparkles = 50;
-          const numSparkles = Math.floor(baseSparkles + (currentProgress * (stageIndex >= 13 ? 30 : 20)));
+          let numSparkles = Math.floor(baseSparkles + (currentProgress * (stageIndex >= 13 ? 30 : 20)));
+          if (compactMode) numSparkles = Math.round(numSparkles * 0.3);
           
           for (let i = 0; i < numSparkles; i++) {
             let sColor = "#FFF8DC";
@@ -698,7 +702,7 @@
             }
         }
         
-        if (stageIndex >= 10) {
+        if (!compactMode && stageIndex >= 10) {
             let saplingHeights = stageIndex >= 12 ? 100 : (stageIndex >= 11 ? 60 : 40);
             const positions = [100, 300];
             if (stageIndex >= 12) positions.push(150);
@@ -729,7 +733,7 @@
             }
         }
         
-        if (stageIndex >= 11) {
+        if (!compactMode && stageIndex >= 11) {
             treeGroup.appendChild(createSVGElement('circle', {
                 cx: 200, cy: 150, r: 100, fill: "url(#goldenCrown)", class: "tree-glow"
             }));
@@ -744,13 +748,13 @@
             }
         }
         
-        if (stageIndex >= 12) {
+        if (!compactMode && stageIndex >= 12) {
             treeGroup.appendChild(createSVGElement('rect', {
                 x: 0, y: 0, width: 400, height: 550, fill: "rgba(226, 157, 66, 0.03)", "pointer-events": "none"
             }));
         }
         
-        if (stageIndex >= 13) {
+        if (!compactMode && stageIndex >= 13) {
             treeGroup.appendChild(createSVGElement('path', {
                 d: "M 0 300 Q 200 -50 400 300",
                 fill: "none", stroke: "url(#rainbowGlow)", "stroke-width": 40,
