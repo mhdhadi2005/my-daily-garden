@@ -38,6 +38,12 @@ const db = {
 // explicit ALTER that's safe to run on every boot.
 const ADDED_COLUMNS = [
   ["subscribers", "referrals_credited", "INTEGER NOT NULL DEFAULT 0"],
+  // Used to be added from inside the tree/harvest route modules at require
+  // time — which runs BEFORE initSchema() creates the tables, so on a fresh
+  // database (e.g. a Railway redeploy without a persistent volume) the ALTER
+  // silently failed and the column never existed: harvesting and the
+  // "since your last visit" save both 500'd in production.
+  ["subscribers", "total_harvests", "INTEGER NOT NULL DEFAULT 0"],
   // Snapshot of what the reader saw on their last visit, so the page can
   // replay how much the tree grew since then. NULL until their first view.
   ["subscribers", "last_viewed_points", "INTEGER"],

@@ -15,16 +15,6 @@ const router = express.Router();
 
 const MAX_STAGE_INDEX = STAGES.length - 1;
 
-// Migration-safe: add total_harvests column if it doesn't exist yet
-function ensureHarvestsColumn() {
-  try {
-    db.exec("ALTER TABLE subscribers ADD COLUMN total_harvests INTEGER NOT NULL DEFAULT 0");
-  } catch (_) {
-    // Column already exists — that's fine
-  }
-}
-ensureHarvestsColumn();
-
 router.post("/api/tree/:beehiivSubscriberId/harvest", (req, res) => {
   const sub = db
     .prepare("SELECT * FROM subscribers WHERE beehiiv_subscriber_id = ?")
