@@ -24,13 +24,11 @@ const OPEN_BONUS_POINTS = 2;      // opens contribute a small bonus, never drive
 const QUIZ_CORRECT_BONUS = 15;
 const REFERRAL_BONUS_POINTS = 50; // per confirmed referral via the subscriber's beehiiv referral link
 
-// Purchase points scale with order value rather than a flat bonus — 1 point
-// per $1 spent, with a floor so a purchase is never worth almost nothing
-// (covers small orders, and orders where WooCommerce doesn't send a total).
-// This ratio is a placeholder: nobody has confirmed real order sizes yet, so
-// tune POINTS_PER_DOLLAR_SPENT once actual store data exists.
-const POINTS_PER_DOLLAR_SPENT = 1;
-const MIN_PURCHASE_POINTS = 10;
+// Purchase points scale with order value — 100 points per $1 spent (set by
+// Harry, 2026-10-03). The floor covers orders where WooCommerce doesn't send
+// a total: worth the same as a $1 order rather than almost nothing.
+const POINTS_PER_DOLLAR_SPENT = 100;
+const MIN_PURCHASE_POINTS = 100;
 
 function pointsForPurchase(amount) {
   const spent = Number(amount);

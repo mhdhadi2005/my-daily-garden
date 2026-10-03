@@ -419,7 +419,8 @@
       $quiz.textContent = `+${pointValues.quiz} pts`;
     }
     if ($purchase && pointValues.purchase) {
-      $purchase.textContent = `+${pointValues.purchase.perDollarSpent} pt/$`;
+      const perDollar = pointValues.purchase.perDollarSpent;
+      $purchase.textContent = `+${perDollar} pt${perDollar === 1 ? "" : "s"} per $1`;
     }
   }
 

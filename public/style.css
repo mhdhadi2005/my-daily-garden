@@ -21,8 +21,20 @@
 
   /* Text — 10almonds navy */
   --text-primary: #262A45;
-  --text-secondary: rgba(38, 42, 69, 0.65);
-  --text-muted: rgba(38, 42, 69, 0.42);
+  /* Solid greys, not translucent navy: text now sits over a busy forest
+     backdrop, and see-through grey on top of it was hard to read. */
+  --text-secondary: #464B66;
+  --text-muted: #5B6079;
+
+  /* Panels over the forest backdrop. These were referenced (points guide,
+     harvest celebration, forest section) but never defined, so those panels
+     rendered fully transparent. */
+  --glass-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(38, 42, 69, 0.08);
+
+  /* Darker amber for TEXT — the brand orange (#FFA01E) is fine as a fill
+     but only ~2:1 contrast as text on white. */
+  --amber-text: #A65F00;
 
   /* Accent Colors — straight from 10almonds' --global-palette CSS vars */
   --gold: #FFA01E;        /* their button/CTA orange */
@@ -221,8 +233,8 @@ body {
 .grove-count {
   font-size: 0.66rem;
   font-weight: 700;
-  color: #C77D14;
-  background: var(--gold-dim);
+  color: var(--amber-text);
+  background: #FFF1DC;
   padding: 2px 9px;
   border-radius: 100px;
 }
@@ -585,7 +597,7 @@ body {
 }
 
 .progress-points strong {
-  color: var(--gold);
+  color: var(--amber-text);
   font-weight: 600;
 }
 
@@ -828,7 +840,7 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   color: #fff;
-  background: var(--gold);
+  background: var(--amber-text); /* white on the bright brand orange is ~2:1 */
   border: none;
   border-radius: 100px;
   cursor: pointer;
@@ -841,12 +853,7 @@ body {
   width: 100%;
   max-width: 380px;
   margin-bottom: 20px;
-  /* Frosted panel so the small hint text stays readable over the forest. */
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  border-radius: 16px;
 }
 
 .demo-label {
@@ -939,8 +946,8 @@ body {
 }
 
 .stage-dot-wrapper.active .stage-dot-label {
-  color: var(--brand-amber);
-  font-weight: 500;
+  color: var(--amber-text);
+  font-weight: 600;
 }
 
 /* ── Particle Container ── */
@@ -1074,14 +1081,61 @@ body {
   color: var(--text-muted);
 }
 
-/* Text that sits directly on the forest background gets a soft white halo
-   and darker greys, so it stays readable over the busy parts of the image. */
-.app-subtitle, .stage-name, .stage-description, .grove-title,
-.progress-label, .progress-points, .app-footer {
-  text-shadow: 0 0 6px rgba(255, 255, 255, 0.95), 0 0 14px rgba(255, 255, 255, 0.8);
+/* ── Readable panels over the forest backdrop ──
+   No content text sits directly on the painted forest: every block gets a
+   near-opaque white panel, so the image frames the page instead of sitting
+   behind the words. The forest scene itself stays open (it's the picture).
+   The header and stage banner share one panel, joined edge to edge. */
+.app-header,
+.stage-banner,
+.progress-section,
+.rewards-section,
+.demo-controls,
+.app-footer p {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 14px rgba(38, 42, 69, 0.08);
+}
+/* No shadows on the joined header/banner pair: two shadows meeting at the
+   seam drew a faint line across the middle of the panel. */
+.app-header,
+.stage-banner {
+  box-shadow: none;
+}
+.app-header {
+  max-width: 440px;
+  padding: 14px 18px 4px;
+  margin-bottom: 0;
+  border-radius: 18px 18px 0 0;
+}
+.stage-banner {
+  width: 100%;
+  max-width: 440px;
+  padding: 2px 18px 14px;
+  border-radius: 0 0 18px 18px;
+}
+.progress-section,
+.rewards-section,
+.demo-controls {
+  padding: 14px 16px;
+  border-radius: 16px;
+}
+.app-footer p {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 100px;
+}
+.grove-head {
+  width: max-content;
+  margin: 8px auto 2px;
+  padding: 4px 6px 4px 12px;
+  background: var(--glass-bg);
+  border-radius: 100px;
+  box-shadow: 0 2px 10px rgba(38, 42, 69, 0.08);
 }
 .app-subtitle, .stage-description, .progress-label, .progress-points,
-.app-footer, .app-footer a {
+.app-footer, .app-footer a, .grove-title {
   color: var(--text-primary);
 }
 
@@ -1402,7 +1456,8 @@ body {
   padding: 14px 32px;
   border: none;
   border-radius: 50px;
-  background: linear-gradient(135deg, var(--brand-amber), #c8860a);
+  /* Deeper amber than the brand orange: white text on #FFA01E is ~2:1. */
+  background: linear-gradient(135deg, #A65F00, #7E4800);
   color: #fff;
   cursor: pointer;
   letter-spacing: 0.02em;
@@ -1428,10 +1483,14 @@ body {
 }
 
 .harvest-hint {
-  margin-top: 8px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  display: inline-block;
+  margin-top: 10px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
   line-height: 1.4;
+  background: var(--glass-bg);
+  border-radius: 12px;
 }
 
 /* ── Harvest Celebration Overlay ── */
@@ -1480,7 +1539,7 @@ body {
   font-family: 'Rubik', sans-serif;
   font-size: 1.8rem;
   font-weight: 900;
-  color: var(--brand-amber);
+  color: var(--amber-text);
   margin-bottom: 8px;
 }
 
@@ -1625,7 +1684,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--brand-amber);
+  color: var(--amber-text);
   background: rgba(226, 157, 66, 0.12);
   border: 1px solid rgba(226, 157, 66, 0.25);
   padding: 4px 10px;
