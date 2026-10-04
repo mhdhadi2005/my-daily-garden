@@ -183,7 +183,6 @@
   // first load of this page, if the tree has grown since then, we snap back
   // to that state and grow it forward stage by stage to now.
   let replayTaken = false;
-  const REPLAY_MAX_MS = 6000;
 
   function takeReplayFor(data) {
     if (replayTaken) return null;
@@ -212,9 +211,18 @@
     });
   }
 
-  function showFrame(frame) {
-    renderTree(frame, false);
-    sizeCurrentTree(frame.stage.index);
+  // Continuous growth position: stage index + how far through that stage.
+  function growthFor(points) {
+    const stages = window.AlmondTree.stages;
+    const idx = stageIndexForPoints(points);
+    const next = stages[idx + 1];
+    return idx + (next ? (points - stages[idx].need) / (next.need - stages[idx].need) : 1);
+  }
+
+  // Labels/progress/particles only — the tree itself is drawn once by the
+  // replay and animates its own growth.
+  function showFrameLabels(frame) {
+    setStageText(frame);
     renderProgress(frame);
     updateParticles(frame.stage.index);
   }
@@ -223,12 +231,17 @@
     const stages = window.AlmondTree.stages;
     const startStage = stageIndexForPoints(replay.fromPoints);
 
-    // Hold the scene at its final (largest) height for the whole replay.
-    if (currentTreeLayout) currentTreeLayout.lockedSceneHeight = sceneHeightFor(data.stage.index);
+    // Your tree as it is now, with everything grown since the last visit
+    // animating in: it rises from its old height, new branches draw outward
+    // and new leaf clusters pop in one after another. Drawn once, so the
+    // animation runs uninterrupted (stepping through a re-draw per stage
+    // swapped whole trees and read as a slideshow, not growth).
+    renderTree(data, false, { sproutFrom: growthFor(replay.fromPoints) });
+    sizeCurrentTree(data.stage.index);
 
-    // Snap back to where they were — same task as the final render that
+    // Labels start where they were — same task as the final render that
     // preceded this, so the browser never paints the final state first.
-    showFrame(replayFrame(data, replay.fromPoints));
+    showFrameLabels(replayFrame(data, replay.fromPoints));
     setValueNow($pointsValue, replay.fromPoints);
     // Not earned yet at the replay's starting point — but hide it without
     // collapsing its space, or everything below jumps twice.
@@ -237,24 +250,24 @@
 
     const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!reduceMotion) {
-      // One step per stage crossed, then the exact current points.
+      // Count up through each stage crossed, then the exact current points,
+      // in step with the tree's sprouting (~3s).
       const steps = [];
       for (let s = startStage + 1; s <= data.stage.index; s++) steps.push(stages[s].need);
       if (steps[steps.length - 1] !== data.points) steps.push(data.points);
-      const stepMs = Math.max(550, Math.min(1100, REPLAY_MAX_MS / steps.length));
+      const stepMs = Math.max(450, Math.min(1000, 3000 / steps.length));
 
-      await sleep(900); // let them see where they were
+      await sleep(600);
       for (const pts of steps) {
         if (requestId !== renderRequestId) return; // superseded (e.g. demo control clicked)
-        showFrame(replayFrame(data, pts));
+        showFrameLabels(replayFrame(data, pts));
         animateValue($pointsValue, pts);
         await sleep(stepMs);
       }
     }
     if (requestId !== renderRequestId) return;
 
-    if (currentTreeLayout) currentTreeLayout.lockedSceneHeight = 0;
-    showFrame(data);
+    showFrameLabels(data);
     renderStats(data);
     renderHarvestButton(data);
     updateStageSelector(data.stage.index);
@@ -307,16 +320,24 @@
   // Sizing/positioning of $treeContainer now happens in renderForest — the
   // current tree is one slot in the same continuous scene as past
   // harvests, not a separate hero box (see renderForest for why).
-  function renderTree(data, animate) {
+  function setStageText(data) {
+    const stageData = window.AlmondTree && window.AlmondTree.stages[data.stage.index];
+    $stageName.textContent = data.stage.name;
+    $stageDescription.textContent = stageData ? stageData.description : "";
+  }
+
+  // `opts.sproutFrom`: growth at the last visit — see playGrowthReplay.
+  function renderTree(data, animate, opts) {
     if (typeof window.AlmondTree === "undefined") {
       $treeContainer.innerHTML = '<p style="color:var(--text-muted)">Tree renderer not loaded</p>';
       return;
     }
-    const stageData = window.AlmondTree.stages[data.stage.index];
-    $stageName.textContent = data.stage.name;
-    $stageDescription.textContent = stageData ? stageData.description : "";
+    setStageText(data);
     const num = currentTreeNumber(data);
-    window.AlmondTree.render($treeContainer, data.stage.index, animate, data.stageProgress || 0.5, num, treeLook(num));
+    // Not `|| 0.5`: progress 0 (exactly at a stage threshold) is real and
+    // must draw the tree at the start of the stage, not halfway through.
+    const progress = typeof data.stageProgress === "number" ? data.stageProgress : 0.5;
+    window.AlmondTree.render($treeContainer, data.stage.index, animate, progress, num, treeLook(num), opts || {});
   }
 
   // ── Stats Rendering ──
@@ -445,20 +466,22 @@
   // progress grove trees use) and reading .getBBox() once per stage; rerun
   // that if the renderer's geometry changes. Zero measurement cost at runtime.
   const TREE_BOUNDS_BY_STAGE = [
-    { x: 166.0, y: 463.7,  width: 68.0,  height: 64.3  },
-    { x: 166.0, y: 412.5,  width: 68.0,  height: 115.5 },
-    { x: 132.0, y: 242.7,  width: 136.0, height: 288.3 },
-    { x: 125.5, y: 183.2,  width: 146.5, height: 347.8 },
-    { x: 48.1,  y: 34.6,   width: 309.8, height: 496.4 },
-    { x: 89.2,  y: 75.9,   width: 234.4, height: 455.1 },
-    { x: 47.7,  y: 93.6,   width: 292.7, height: 437.4 },
-    { x: 19.0,  y: 38.0,   width: 342.0, height: 493.0 },
-    { x: -8.9,  y: -20.3,  width: 408.4, height: 551.3 },
-    { x: -2.2,  y: -14.6,  width: 442.3, height: 545.6 },
-    { x: -47.9, y: -108.5, width: 528.0, height: 666.8 },
-    { x: -11.7, y: -14.5,  width: 452.0, height: 565.7 },
-    { x: -65.0, y: -109.1, width: 548.4, height: 643.2 },
-    { x: -14.7, y: -107.2, width: 471.0, height: 640.9 },
+    // Median across tree shapes/looks at progress=1 (continuous-growth
+    // renderer). Within a stage the tree grows inside this box.
+    { x: 166.0, y: 465.9, width: 68.0,  height: 62.1  },
+    { x: 150.8, y: 277.3, width: 98.6,  height: 252.1 },
+    { x: 129.5, y: 199.1, width: 150.5, height: 333.0 },
+    { x: 98.1,  y: 143.6, width: 219.9, height: 388.4 },
+    { x: 64.9,  y: 69.1,  width: 282.5, height: 462.5 },
+    { x: 73.6,  y: 87.8,  width: 273.7, height: 445.6 },
+    { x: 49.5,  y: 52.8,  width: 326.3, height: 486.8 },
+    { x: 19.0,  y: 26.1,  width: 359.4, height: 514.1 },
+    { x: 3.5,   y: -0.2,  width: 392.0, height: 533.4 },
+    { x: 0.2,   y: -24.8, width: 408.9, height: 559.5 },
+    { x: -0.2,  y: -49.4, width: 432.8, height: 599.6 },
+    { x: -3.5,  y: -53.2, width: 450.4, height: 586.3 },
+    { x: -7.0,  y: -65.3, width: 450.6, height: 614.0 },
+    { x: -8.2,  y: -66.4, width: 452.9, height: 631.9 },
   ];
 
   // Every tree has an identity for its whole life: tree #N (the Nth tree a
@@ -500,7 +523,7 @@
   // looks/variants; the widest shapes spill slightly rather than shrinking
   // every tree to fit them.
   const FOREST_TREE_STAGE = 13;
-  const FOREST_TREE_BOUNDS = { x: -64.4, y: -90.5, width: 518.5, height: 637.6 }; // median across looks; widths 500–595
+  const FOREST_TREE_BOUNDS = { x: -8.2, y: -66.4, width: 451.8, height: 622.2 }; // median across looks/shapes
 
   function fitTreeToBox(container, stageIndex, boxOverride) {
     const svg = container.querySelector("svg");
@@ -525,10 +548,14 @@
   // (the old approach) made the tree SHRINK between some stages, since later
   // stages are often wider but squatter — visible as the tree getting
   // smaller mid-way through the growth replay.
+  // Early stages start big (0.97x at Sapling, was 0.62x): for a new reader
+  // the young tree is the whole show, and a ~100px sapling in a wide forest
+  // read as "a bare stick in an empty field" (Harry's screenshot).
   function currentTreeHeightScale(stageIndex) {
+    if (stageIndex === 0) return 0.5; // the seed sprite is tiny by nature
     const last = TREE_BOUNDS_BY_STAGE.length - 1;
     const t = Math.max(0, Math.min(1, stageIndex / last));
-    return 0.45 + 1.35 * Math.pow(t, 0.8); // 0.45x (Seed) .. 1.8x (Enchanted Grove)
+    return 0.8 + 1.0 * Math.pow(t, 0.7); // ~0.97x (Sapling) .. 1.8x (Enchanted Grove)
   }
 
   // Layout from the last renderForest, so the current tree can be resized to
@@ -564,9 +591,7 @@
     $treeContainer.style.width = `${width.toFixed(0)}px`;
     $treeContainer.style.height = `${height.toFixed(0)}px`;
     fitTreeToBox($treeContainer, stageIndex);
-    // During a growth replay the scene is held at its final height, so the
-    // progress bar and everything below it don't move as the tree grows.
-    L.scene.style.height = `${Math.max(sceneHeightFor(stageIndex), L.lockedSceneHeight || 0)}px`;
+    L.scene.style.height = `${sceneHeightFor(stageIndex)}px`;
     return { xPercent, width, height };
   }
 

@@ -56,6 +56,50 @@
       .tree-clump {
         animation: clumpSway 5s ease-in-out infinite alternate;
       }
+      /* Growth replay: new clusters pop in, new branches draw outward, and
+         the tree rises from its last-visit height. */
+      .tree-sprout {
+        animation: treeSprout 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+      }
+      @keyframes treeSprout {
+        from { transform: scale(0); opacity: 0; }
+        60%  { opacity: 1; }
+        to   { transform: scale(1); opacity: 1; }
+      }
+      .tree-sprout-branch {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: branchGrow 0.6s ease-out both;
+      }
+      @keyframes branchGrow {
+        to { stroke-dashoffset: 0; }
+      }
+      .tree-grow-branch {
+        stroke-dasharray: 1;
+        animation: branchExtend 0.9s ease-out both;
+      }
+      @keyframes branchExtend {
+        from { stroke-dashoffset: var(--from-offset, 0.3); }
+        to   { stroke-dashoffset: 0; }
+      }
+      .tree-swell {
+        animation: treeSwell 0.9s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+      }
+      @keyframes treeSwell {
+        from { transform: scale(var(--swell-from, 0.6)); }
+        to   { transform: scale(1); }
+      }
+      .tree-rise {
+        transform-origin: 200px 520px;
+        animation: treeRise 1.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+      }
+      @keyframes treeRise {
+        from { transform: scale(var(--rise-from, 0.8)); }
+        to   { transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .tree-sprout, .tree-sprout-branch, .tree-grow-branch, .tree-swell, .tree-rise { animation: none; stroke-dashoffset: 0; }
+      }
       @keyframes clumpSway {
         0% { transform: rotate(-0.8deg); }
         100% { transform: rotate(0.8deg); }
@@ -283,11 +327,95 @@
     svg.appendChild(group);
   }
 
+  // ── Continuous growth ──
+  // The tree's size is a smooth function of g = stage + progress-in-stage,
+  // and its shape comes from a fixed skeleton per tree. So every point a
+  // reader earns makes THIS tree a little taller and fuller — branches
+  // extend, new ones sprout, leaf clusters fill in — instead of the old
+  // model where each stage was a separate drawing and points within a stage
+  // barely changed anything (which made most visits look identical).
+  //   key per stage: [trunk height, trunk thickness, branch levels]
+  // `levels` is fractional: 2.4 = two levels fully grown, the third 40% out.
+  const GROWTH_KEYS = [
+    [  0,  0, 0.0],  // 0 Seed — drawn separately
+    [ 72,  7, 1.5],  // 1 Sapling
+    [110, 13, 2.1],  // 2 Young Tree
+    [138, 20, 2.5],  // 3 Budding Branches
+    [150, 24, 3.0],  // 4 Blossom
+    [158, 26, 3.3],  // 5 Green Almonds
+    [164, 28, 3.6],  // 6 Ripening Almonds
+    [170, 32, 4.0],  // 7 Harvest Tree
+    [180, 48, 4.2],  // 8 Ancient Almond Tree
+    [185, 54, 4.5],  // 9
+    [190, 58, 4.8],  // 10
+    [195, 62, 5.0],  // 11
+    [196, 62, 5.0],  // 12
+    [200, 65, 5.0],  // 13 Enchanted Grove
+  ];
+  function growthParams(g) {
+    const last = GROWTH_KEYS.length - 1;
+    const s = Math.max(0, Math.min(last, Math.floor(g)));
+    const n = Math.min(last, s + 1);
+    const f = Math.max(0, Math.min(1, g - s));
+    const a = GROWTH_KEYS[s], b = GROWTH_KEYS[n];
+    return { h: a[0] + (b[0] - a[0]) * f, t: a[1] + (b[1] - a[1]) * f, levels: a[2] + (b[2] - a[2]) * f };
+  }
+  function clumpRadiusFor(g) { return 14 + 0.95 * g; }
+
+  // Seeded generator independent of the global sequence, so a tree's
+  // skeleton and per-cluster details never shift as it grows.
+  function seededRng(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // A tree's full branch structure, fixed per tree (variant). Each render
+  // reveals as much of it as the tree's growth allows. Depth 5 keeps the
+  // node count where the earlier freeze fix left it (see the branch-depth
+  // note in the render function).
+  const SKELETON_DEPTH = 5;
+  const skeletonCache = new Map();
+  function getSkeleton(seed) {
+    if (skeletonCache.has(seed)) return skeletonCache.get(seed);
+    const rnd = seededRng(seed * 7919 + 101);
+    let nextId = 1;
+    function grow(level) {
+      if (level >= SKELETON_DEPTH) return [];
+      const count = rnd() > (level === 1 ? 0.5 : 0.4) ? 3 : 2;
+      const spread = 1.25 + level * 0.2;
+      const kids = [];
+      for (let i = 0; i < count; i++) {
+        kids.push({ id: nextId++, angle: -spread / 2 + (spread / (count - 1)) * i + (rnd() - 0.5) * 0.4, len: 0.6 + rnd() * 0.25 });
+      }
+      kids.forEach((k) => { k.children = grow(level + 1); });
+      return kids;
+    }
+    const root = { id: 0, angle: (rnd() - 0.5) * 0.12, len: 1, children: grow(1) };
+    skeletonCache.set(seed, root);
+    return root;
+  }
+
+  // Growth replay: growth the reader had at their last visit. Anything that
+  // didn't exist then is drawn with a sprout animation (branches draw
+  // outward, clusters pop in, staggered), so a visit shows what grew.
+  let sproutFromLevels = null;
+  let sproutOrder = 0;
+  function sproutDelay(order, offset) {
+    return (0.6 + (order % 28) * 0.08 + (offset || 0)).toFixed(2);
+  }
+
   // Foliage is queued during branch recursion and drawn after it, so the
   // canopy sits on top of every branch — drawing it inline let later
-  // branches slice across earlier clumps. Inner-joint "filler" clumps are
-  // queued before their children, so they end up behind the tip clumps.
+  // branches slice across earlier clumps. Parents are queued before their
+  // children, so inner clusters sit behind the outer ones.
   let foliageQueue = [];
+  let currentGrowth = 0;
+  let currentVariant = 0;
   function flushFoliage(svg, originX, originY) {
     const q = foliageQueue;
     foliageQueue = [];
@@ -306,48 +434,93 @@
     canopy.appendChild(layers.mid);
     canopy.appendChild(layers.light);
     canopy.appendChild(layers.extra);
-    q.forEach(([kind, x, y, angle, stageIndex]) => {
-      if (kind === "fill") drawClump(layers, x, y, clumpRadius(stageIndex) * 0.9, stageIndex);
-      else drawFoliage(layers.extra, x, y, angle, stageIndex, layers);
+    q.forEach(([kind, x, y, stageIndex, nodeId, scale, sprout]) => {
+      // Per-cluster randomness comes from the cluster's own seed, not the
+      // shared sequence, so the same cluster looks the same on every visit.
+      const savedSeed = randomSeed;
+      randomSeed = currentVariant * 1009 + nodeId * 104729 + 7;
+      const r = clumpRadiusFor(currentGrowth) * scale * (0.92 + random() * 0.16);
+      let anim = null;
+      if (sprout) {
+        const origin = `transform-origin:${x.toFixed(1)}px ${y.toFixed(1)}px; animation-delay:${sproutDelay(sprout.order, 0.25)}s`;
+        anim = sprout.grewFrom
+          ? { cls: "tree-swell", style: `${origin}; --swell-from:${Math.max(0.35, sprout.grewFrom).toFixed(3)}` }
+          : { cls: "tree-sprout", style: origin };
+      }
+      drawClump(layers, x, y, r, stageIndex, anim, kind === "fill");
+      if (kind === "tip") {
+        randomSeed = currentVariant * 1009 + nodeId * 104729 + stageIndex * 31 + 11;
+        const extras = createSVGElement('g', anim ? { class: anim.cls, style: anim.style } : {});
+        drawFoliage(extras, x, y, r, stageIndex);
+        if (extras.childNodes.length) layers.extra.appendChild(extras);
+      }
+      randomSeed = savedSeed;
     });
     svg.appendChild(canopy);
   }
 
-  function buildTreeBranches(svg, x, y, angle, length, thickness, level, maxLevel, stageIndex) {
-    if (level > maxLevel) return;
-
-    const endX = x + Math.cos(angle) * length;
-    const endY = y + Math.sin(angle) * length;
-    if (maxLevel >= 3 && level >= 2 && level < maxLevel) foliageQueue.push(["fill", endX, endY, angle, stageIndex]);
-    
-    if (level > 0) {
-      const color = stageIndex >= 7 ? "#4A2E19" : "#6B4423";
-      const controlX = x + Math.cos(angle - 0.2) * (length * 0.5);
-      const controlY = y + Math.sin(angle - 0.2) * (length * 0.5);
-      
-      svg.appendChild(createSVGElement('path', {
-        d: `M ${x} ${y} Q ${controlX} ${controlY} ${endX} ${endY}`,
-        stroke: color,
-        "stroke-width": thickness,
-        fill: "none",
-        "stroke-linecap": "round"
-      }));
+  // Draws one skeleton node's branch, as far as growth allows, then its
+  // children. `level` 1 is the trunk's continuation above the first fork.
+  function growBranch(svg, node, level, x, y, parentAngle, length, thickness, P, stageIndex, color) {
+    const reveal = Math.max(0, Math.min(1, P.levels - (level - 1)));
+    if (reveal <= 0) return;
+    const angle = parentAngle + node.angle;
+    const fullLen = length * node.len;
+    const len = fullLen * reveal;
+    const endX = x + Math.cos(angle) * len;
+    const endY = y + Math.sin(angle) * len;
+    // Growth replay: brand-new branches sprout; branches that already
+    // existed but grew since the last visit extend and swell from their old
+    // size — so even a small day's reading visibly grows the tree.
+    let sprout = null;
+    if (sproutFromLevels !== null) {
+      const reveal0 = Math.max(0, Math.min(1, sproutFromLevels - (level - 1)));
+      if (reveal0 <= 0) sprout = { order: sproutOrder++ };
+      else if (reveal0 < reveal - 0.01) sprout = { order: sproutOrder++, grewFrom: reveal0 / reveal };
     }
 
-    if (level < maxLevel) {
-      let numBranches = 2;
-      if (stageIndex >= 3 && random() > 0.4) numBranches = 3;
-      if (stageIndex >= 8 && level > 1) numBranches = random() > 0.2 ? 3 : 2;
-      
-      for (let i = 0; i < numBranches; i++) {
-        const spread = (stageIndex >= 7 ? 1.45 : 1.15) + (level * 0.2);
-        const newAngle = angle - spread/2 + (spread / (numBranches - 1 || 1)) * i + randomRange(-0.2, 0.2);
-        const lengthFactor = randomRange(0.6, 0.85);
-        buildTreeBranches(svg, endX, endY, newAngle, length * lengthFactor, thickness * 0.72, level + 1, maxLevel, stageIndex);
+    const cX = x + Math.cos(angle - 0.2) * len * 0.5;
+    const cY = y + Math.sin(angle - 0.2) * len * 0.5;
+    const attrs = {
+      d: `M ${x} ${y} Q ${cX} ${cY} ${endX} ${endY}`,
+      stroke: color,
+      "stroke-width": Math.max(1.2, thickness * Math.sqrt(reveal)),
+      fill: "none",
+      "stroke-linecap": "round"
+    };
+    if (sprout) {
+      attrs.pathLength = 1;
+      if (sprout.grewFrom) {
+        attrs.class = "tree-grow-branch";
+        attrs.style = `--from-offset:${(1 - sprout.grewFrom).toFixed(3)}; animation-delay:${sproutDelay(sprout.order)}s`;
+      } else {
+        attrs.class = "tree-sprout-branch";
+        attrs.style = `animation-delay:${sproutDelay(sprout.order)}s`;
       }
-    } else {
-      foliageQueue.push(["tip", endX, endY, angle, stageIndex]);
     }
+    svg.appendChild(createSVGElement('path', attrs));
+
+    const kids = level < SKELETON_DEPTH ? (node.children || []) : [];
+    const childReveal = kids.length ? Math.max(0, Math.min(1, P.levels - level)) : 0;
+    if (reveal < 1) {
+      // Still growing outward: a small cluster at the growing tip.
+      foliageQueue.push(["tip", endX, endY, stageIndex, node.id, 0.35 + 0.65 * reveal, sprout]);
+      return;
+    }
+    // Every grown node carries a cluster; it eases from a full tip cluster
+    // to an inner filler as its own children grow out — continuous, so the
+    // canopy never suddenly thins at a level boundary.
+    foliageQueue.push([childReveal >= 1 ? "fill" : "tip", endX, endY, stageIndex, node.id, 1 - 0.1 * childReveal, sprout]);
+    if (childReveal > 0) {
+      kids.forEach((k) => growBranch(svg, k, level + 1, endX, endY, angle, fullLen, thickness * 0.72, P, stageIndex, color));
+    }
+  }
+
+  // Trunk + canopy for one tree rooted at (originX, 520).
+  function growTree(svg, originX, P, stageIndex, skeleton) {
+    const color = stageIndex >= 7 ? "#4A2E19" : "#6B4423";
+    growBranch(svg, skeleton, 1, originX, 520 - P.h, -Math.PI / 2, P.h * 0.62, P.t * 0.6, P, stageIndex, color);
+    flushFoliage(svg, originX, 520 - P.h);
   }
 
   // Canopy palettes: [shadow, mid, highlight]. Flat layered tones, like
@@ -372,28 +545,32 @@
   // first, then every mid-tone, then every highlight merges the clumps
   // into one scalloped crown. Per-clump grouping stacked them as separate
   // shaded balls, which read as bubbles, not a canopy.
-  function drawClump(layers, x, y, r, stageIndex) {
+  // `anim` (growth replay): {cls, style} — pop in from nothing (tree-sprout)
+  // or swell from its last-visit size (tree-swell).
+  // `inner`: a cluster at an inner branch joint, mostly hidden behind the
+  // outer ones — drawn as just its body (2 shapes, not 5), which keeps the
+  // continuous-growth canopy close to the old node budget.
+  function drawClump(layers, x, y, r, stageIndex, anim, inner) {
     const [dark, mid, light] = canopyPalette(stageIndex);
-    for (let i = 0; i < 2; i++) {
-      const a = randomRange(0, Math.PI * 2);
-      layers.dark.appendChild(createSVGElement('circle', {
-        cx: x + Math.cos(a) * r * 0.75, cy: y + Math.sin(a) * r * 0.6, r: r * 0.55, fill: dark
-      }));
+    const extra = anim ? { class: anim.cls, style: anim.style } : {};
+    if (!inner) {
+      for (let i = 0; i < 2; i++) {
+        const a = randomRange(0, Math.PI * 2);
+        layers.dark.appendChild(createSVGElement('circle', Object.assign({
+          cx: x + Math.cos(a) * r * 0.75, cy: y + Math.sin(a) * r * 0.6, r: r * 0.55, fill: dark
+        }, extra)));
+      }
     }
-    layers.dark.appendChild(createSVGElement('circle', { cx: x, cy: y, r: r, fill: dark }));
-    layers.mid.appendChild(createSVGElement('circle', { cx: x - r * 0.15, cy: y - r * 0.2, r: r * 0.8, fill: mid }));
-    layers.light.appendChild(createSVGElement('ellipse', { cx: x - r * 0.25, cy: y - r * 0.5, rx: r * 0.5, ry: r * 0.3, fill: light, opacity: 0.85 }));
+    layers.dark.appendChild(createSVGElement('circle', Object.assign({ cx: x, cy: y, r: r, fill: dark }, extra)));
+    layers.mid.appendChild(createSVGElement('circle', Object.assign({ cx: x - r * 0.15, cy: y - r * 0.2, r: r * 0.8, fill: mid }, extra)));
+    if (!inner) {
+      layers.light.appendChild(createSVGElement('ellipse', Object.assign({ cx: x - r * 0.25, cy: y - r * 0.5, rx: r * 0.5, ry: r * 0.3, fill: light, opacity: 0.85 }, extra)));
+    }
   }
 
-  function clumpRadius(stageIndex) {
-    const base = stageIndex >= 8 ? 26 : (stageIndex >= 4 ? 22 : 17);
-    return base + currentProgress * 3 + randomRange(-2, 2);
-  }
-
-  // `svg` here is the extras layer (blossoms, buds, almonds) drawn above the canopy.
-  function drawFoliage(svg, x, y, angle, stageIndex, layers) {
-    const r = clumpRadius(stageIndex);
-    drawClump(layers, x, y, r, stageIndex);
+  // Blossoms, buds and almonds on one cluster of radius r (the cluster
+  // itself is drawn by flushFoliage). `svg` is that cluster's extras group.
+  function drawFoliage(svg, x, y, r, stageIndex) {
 
     // A tree's look (its colours) applies through every stage via
     // canopyPalette; the stage's own story below (blossoms at Blossom,
@@ -494,12 +671,20 @@
     // at every stage and after it's harvested. `opts.compact` is for
     // harvested trees in the forest: the full grown tree minus the
     // once-per-screen extras (rainbow, glow, companion saplings).
+    // `opts.sproutFrom` (growth replay): the reader's growth g at their last
+    // visit — everything grown since then animates in.
     render: function(containerElement, stageIndex, animate = true, progress = 0.5, variant = 0, look = null, opts = {}) {
       injectStyles();
       containerElement.innerHTML = '';
       currentProgress = progress;
       currentLook = LOOKS[look] ? look : null;
       compactMode = !!opts.compact;
+      const g = Math.min(stageIndex + Math.max(0, Math.min(1, progress)), GROWTH_KEYS.length - 0.001);
+      currentGrowth = g;
+      currentVariant = variant;
+      const sproutFrom = typeof opts.sproutFrom === "number" && opts.sproutFrom < g ? opts.sproutFrom : null;
+      sproutFromLevels = sproutFrom !== null ? growthParams(sproutFrom).levels : null;
+      sproutOrder = 0;
       
       const svg = createSVGElement('svg', {
         viewBox: "0 0 400 550",
@@ -550,8 +735,14 @@
       drawSoil(svg, stageIndex);
 
       const treeGroup = createSVGElement('g');
-      const scaleFactor = 1.0 + (currentProgress * 0.04);
-      treeGroup.setAttribute('transform', `translate(200, 520) scale(${scaleFactor}) translate(-200, -520)`);
+      // Growth replay: the whole tree rises from the height it had at the
+      // last visit while the new branches and clusters sprout.
+      if (sproutFrom !== null && stageIndex >= 1) {
+        const h0 = growthParams(sproutFrom).h, h1 = growthParams(g).h;
+        const riseFrom = h1 > 0 ? Math.max(0.45, Math.min(1, h0 / h1)) : 1;
+        treeGroup.setAttribute('class', 'tree-rise');
+        treeGroup.setAttribute('style', `--rise-from:${riseFrom.toFixed(3)}`);
+      }
       svg.appendChild(treeGroup);
 
       if (stageIndex === 0) {
@@ -571,40 +762,14 @@
           }
         }
       } 
-      else if (stageIndex === 1) {
-        const stemWidth = currentProgress >= 0.7 ? 5 : 4;
-        treeGroup.appendChild(createSVGElement('path', {
-          d: "M 200 520 Q 195 460 205 420", stroke: "#6B4423", fill: "none", "stroke-width": stemWidth
-        }));
-        drawLeaf(treeGroup, 202, 470, 8, "#3E8E5A", -30);
-        drawLeaf(treeGroup, 198, 440, 8, "#3E8E5A", 210);
-        drawLeaf(treeGroup, 205, 420, 10, "#3E8E5A", -10);
-        
-        if (currentProgress >= 0.7) {
-          drawLeaf(treeGroup, 196, 455, 7, "#3E8E5A", 160);
-        }
-      }
       else {
-        // Trunk height to the first fork. Kept short relative to the canopy
-        // (trunk ~40% of the tree, like a real almond / the chosen mockup)
-        // — the old values made a tall bare pole with a small cap on top.
-        const heights =    [0, 0, 120, 150, 155, 160, 165, 170, 180, 185, 190, 195, 195, 200];
-        const thicknesses = [0, 0,  15,  25,  25,  25,  28,  32,  50,  55,  58,  62,  62,  65];
-        // Branch depth — each +1 here multiplies node count by ~2.7x (the
-        // branching factor below), so this looks small but isn't. The old
-        // array went up to 7, which generated ~16,000 DOM nodes for a single
-        // tree at the top stages (measured) — with up to 9 of those drawn at
-        // once in the forest grove, that's 100,000+ nodes and a multi-second
-        // frozen tab. Capped at 5: same visual growth curve, ~10x fewer nodes.
-        const levels =     [0, 0,   2,   2,   3,   3,   3,   4,   4,   4,   5,   5,   5,   5];
-        
-        const h    = heights[stageIndex];
-        const t    = thicknesses[stageIndex];
-        const maxL = levels[stageIndex];
-
-        drawTrunk(treeGroup, h, t, stageIndex >= 7 ? "#4A2E19" : "#6B4423", stageIndex);
-        buildTreeBranches(treeGroup, 200, 520 - h, -Math.PI / 2, h * 0.62, t * 0.6, 1, maxL, stageIndex);
-        flushFoliage(treeGroup, 200, 520 - h);
+        // Sapling onwards: one skeleton per tree, revealed by growth (see
+        // GROWTH_KEYS). Branch depth caps at 5 (SKELETON_DEPTH) — each extra
+        // level multiplies node count ~2.7x; an old depth of 7 generated
+        // ~16,000 DOM nodes per tree and froze the tab with a full forest.
+        const P = growthParams(g);
+        drawTrunk(treeGroup, P.h, P.t, stageIndex >= 7 ? "#4A2E19" : "#6B4423", stageIndex);
+        growTree(treeGroup, 200, P, stageIndex, getSkeleton(variant));
 
         if (stageIndex === 4) {
           for (let i = 0; i < 15; i++) {
@@ -709,10 +874,17 @@
             
             positions.forEach(sx => {
                 const h = saplingHeights * randomRange(0.8, 1.2);
-                drawTrunk(treeGroup, h, stageIndex >= 12 ? 8 : 4, "#6B4423", 2);
+                // Own trunk under the sapling (drawTrunk only draws at the
+                // tree's centre, which left these hidden behind the main trunk).
+                treeGroup.appendChild(createSVGElement('path', {
+                    d: `M ${sx} 520 L ${sx} ${520 - h}`, stroke: "#6B4423",
+                    "stroke-width": stageIndex >= 12 ? 6 : 3, "stroke-linecap": "round"
+                }));
                 if (stageIndex >= 12) {
-                    buildTreeBranches(treeGroup, sx, 520 - h, -Math.PI / 2, h * 0.4, 4, 1, 2, stageIndex);
-                    flushFoliage(treeGroup, sx, 520 - h);
+                    const savedSprout = sproutFromLevels;
+                    sproutFromLevels = null; // companions aren't part of the replay
+                    growTree(treeGroup, sx, { h, t: 6, levels: 2 }, stageIndex, getSkeleton(variant * 31 + sx));
+                    sproutFromLevels = savedSprout;
                     for(let k=0; k<3; k++) {
                         drawAlmond(treeGroup, sx + randomRange(-15, 15), 520 - h + randomRange(-10, 20), randomRange(4, 6), "#DAA520");
                     }
