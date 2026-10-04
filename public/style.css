@@ -636,12 +636,10 @@ body {
   pointer-events: none;
 }
 
-.stat-card:hover {
-  background: var(--surface-hover);
-  border-color: rgba(37, 34, 67, 0.15);
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 28px rgba(37, 34, 67, 0.14);
-}
+/* No hover effect on stat cards, reward items or points-guide rows: they
+   aren't clickable, and the old hover both lifted them (implying a click)
+   and swapped their white background for a 93%-transparent grey, so the
+   forest showed through the text exactly when someone pointed at it. */
 
 /* Themed tint per stat, in the fixed order they appear in index.html */
 .stats-grid .stat-card:nth-child(1) { --_stat-tint: rgba(255, 160, 30, 0.14); }  /* streak — brand orange */
@@ -729,10 +727,6 @@ body {
   box-shadow: var(--shadow-card);
 }
 
-.reward-item:hover {
-  background: var(--surface-hover);
-  transform: translateY(-1px);
-}
 
 .reward-icon {
   line-height: 0;
@@ -1711,21 +1705,12 @@ body {
               border-color var(--duration-fast) var(--ease-out);
 }
 
-.point-guide-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-  border-color: rgba(226, 157, 66, 0.4);
-}
 
 .point-guide-card.featured {
   background: linear-gradient(135deg, #FFFFFF 0%, #FFFDF8 100%);
   border-color: rgba(226, 157, 66, 0.35);
 }
 
-.point-guide-card.featured:hover {
-  border-color: var(--brand-amber);
-  box-shadow: 0 6px 20px rgba(226, 157, 66, 0.15);
-}
 
 .point-guide-icon-bg {
   width: 38px;
