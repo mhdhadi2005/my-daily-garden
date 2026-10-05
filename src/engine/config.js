@@ -128,7 +128,23 @@ function daysBetween(dateStrA, dateStrB) {
   return Math.round((b - a) / 86400000);
 }
 
+// The stored `streak` only resets on the reader's NEXT engagement (see
+// updateStreak), so someone who stopped three weeks ago still has their old
+// number in the row. This is the streak as it really stands today:
+//   "lit"     — engaged today
+//   "waiting" — engaged yesterday, not yet today: still alive, at risk
+//   "broken"  — missed a whole day, so it's gone (streak 0)
+//   "none"    — never engaged
+function streakStatus(sub, today = todayStr()) {
+  if (!sub.last_engaged_date) return { streak: 0, state: "none" };
+  const gap = daysBetween(sub.last_engaged_date, today);
+  if (gap <= 0) return { streak: sub.streak, state: "lit" };
+  if (gap === 1) return { streak: sub.streak, state: "waiting" };
+  return { streak: 0, state: "broken" };
+}
+
 module.exports = {
+  streakStatus,
   STAGES,
   POINTS_PER_CLICK,
   DAILY_CLICK_CAP,

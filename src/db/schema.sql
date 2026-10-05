@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
   total_harvests      INTEGER NOT NULL DEFAULT 0, -- trees completed and added to the forest
   last_viewed_points  INTEGER,              -- snapshot at last tree-page visit (growth replay); NULL = never viewed
   last_viewed_harvests INTEGER,
+  last_viewed_streak  INTEGER,
   last_viewed_at      TEXT,
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );

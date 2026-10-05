@@ -41,6 +41,7 @@
   let currentStage      = -1;
   let currentData       = null;
   let demoHarvests      = 0;
+  let demoStreakState   = "lit";
   let particleInterval  = null;
   let isRealMode        = false;
   // Bumped at the start of every fetchAndRender call; a call only touches the
@@ -85,6 +86,8 @@
   // Harvest
   const $harvestSection   = document.getElementById("harvest-section");
   const $growthReplay     = document.getElementById("growth-replay");
+  const $streakHint       = document.getElementById("streak-hint");
+  const $stageBanner      = document.querySelector(".stage-banner");
   const $harvestBtn       = document.getElementById("harvest-btn");
   const $harvestOverlay   = document.getElementById("harvest-overlay");
   const $harvestEmoji     = document.getElementById("harvest-emoji");
@@ -121,7 +124,7 @@
     if (isRealMode) {
       url = REAL_API + encodeURIComponent(realSubscriberId);
     } else {
-      url = `${DEMO_API}?stage=${stageIndex}&harvests=${demoHarvests}`;
+      url = `${DEMO_API}?stage=${stageIndex}&harvests=${demoHarvests}&streakState=${demoStreakState}`;
     }
     try {
       const res = await fetch(url);
@@ -151,6 +154,7 @@
 
     renderTree(data, shouldAnimate);
     renderStats(data);
+    renderStreakHint(data);
     renderProgress(data);
     renderRewards(data.rewards);
     renderForest(data);
@@ -194,7 +198,10 @@
     // current tree started from a seed after the last visit.
     const fromPoints = harvestedSince > 0 ? 0 : last.points;
     if (harvestedSince <= 0 && data.points <= fromPoints) return null; // no growth
-    return { fromPoints, harvestedSince: Math.max(0, harvestedSince), at: last.at };
+    // Snapshots from before streaks were recorded have no streak: treat
+    // the lights as already there rather than flying them all in.
+    const fromStreak = typeof last.streak === "number" ? last.streak : data.streak;
+    return { fromPoints, fromStreak, harvestedSince: Math.max(0, harvestedSince), at: last.at };
   }
 
   // A snapshot of `data` as it would have looked at `points`.
@@ -236,34 +243,44 @@
     // and new leaf clusters pop in one after another. Drawn once, so the
     // animation runs uninterrupted (stepping through a re-draw per stage
     // swapped whole trees and read as a slideshow, not growth).
-    renderTree(data, false, { sproutFrom: growthFor(replay.fromPoints) });
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const fromStreak = typeof replay.fromStreak === "number" ? replay.fromStreak : data.streak;
+    renderTree(data, false, {
+      sproutFrom: growthFor(replay.fromPoints),
+      fromStreak: reduceMotion ? data.streak : fromStreak,
+    });
     sizeCurrentTree(data.stage.index);
 
     // Labels start where they were — same task as the final render that
     // preceded this, so the browser never paints the final state first.
     showFrameLabels(replayFrame(data, replay.fromPoints));
     setValueNow($pointsValue, replay.fromPoints);
+    if ($streakValue) setValueNow($streakValue, Math.min(fromStreak, data.streak));
     // Not earned yet at the replay's starting point — but hide it without
     // collapsing its space, or everything below jumps twice.
     if ($harvestSection) $harvestSection.style.visibility = "hidden";
-    showReplayBanner(data, replay, startStage);
+    showReplayBanner(data, replay, startStage, fromStreak);
 
-    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!reduceMotion) {
       // Count up through each stage crossed, then the exact current points,
-      // in step with the tree's sprouting (~3s).
+      // in step with the tree's sprouting (~3s). Every stage crossed gets
+      // its own little celebration; the one you've landed on gets the
+      // "New stage!" ribbon.
       const steps = [];
-      for (let s = startStage + 1; s <= data.stage.index; s++) steps.push(stages[s].need);
-      if (steps[steps.length - 1] !== data.points) steps.push(data.points);
-      const stepMs = Math.max(450, Math.min(1000, 3000 / steps.length));
+      for (let s = startStage + 1; s <= data.stage.index; s++) steps.push({ pts: stages[s].need, stage: s });
+      if (!steps.length || steps[steps.length - 1].pts !== data.points) steps.push({ pts: data.points });
+      const stepMs = Math.max(650, Math.min(1100, 3300 / steps.length));
 
       await sleep(600);
-      for (const pts of steps) {
+      for (const step of steps) {
         if (requestId !== renderRequestId) return; // superseded (e.g. demo control clicked)
-        showFrameLabels(replayFrame(data, pts));
-        animateValue($pointsValue, pts);
+        showFrameLabels(replayFrame(data, step.pts));
+        animateValue($pointsValue, step.pts);
+        if (step.stage !== undefined) celebrateStage(step.stage, step.stage === data.stage.index);
         await sleep(stepMs);
       }
+    } else if (data.stage.index > startStage) {
+      celebrateStage(data.stage.index, true);
     }
     if (requestId !== renderRequestId) return;
 
@@ -274,13 +291,14 @@
     setTimeout(hideReplayBanner, 4000);
   }
 
-  function showReplayBanner(data, replay, startStage) {
+  function showReplayBanner(data, replay, startStage, fromStreak) {
     if (!$growthReplay) return;
     const stages = window.AlmondTree.stages;
     const gained = data.points - replay.fromPoints;
     const parts = [];
     if (gained > 0) parts.push(`<strong>+${gained} points</strong>`);
     if (data.stage.index !== startStage) parts.push(`${stages[startStage].name} → ${data.stage.name}`);
+    if (data.streak > fromStreak) parts.push(`${data.streak}-day streak`);
     if (replay.harvestedSince > 0) {
       parts.push(`${replay.harvestedSince} new tree${replay.harvestedSince === 1 ? "" : "s"} in your forest`);
     }
@@ -338,6 +356,156 @@
     // must draw the tree at the start of the stage, not halfway through.
     const progress = typeof data.stageProgress === "number" ? data.stageProgress : 0.5;
     window.AlmondTree.render($treeContainer, data.stage.index, animate, progress, num, treeLook(num), opts || {});
+    renderStreakLights(data, opts && opts.fromStreak);
+  }
+
+  // ── Streak lights ──
+  // The streak lives ON the tree: a firefly for every day in a row, and
+  // every full week those seven fireflies become one lantern. Coming back
+  // and seeing tonight's new light arrive is the "I'm keeping it going"
+  // moment. They dim while today hasn't been read yet, and fly off when a
+  // day is missed (streakState from the server — see streakStatus).
+  // Plain HTML moved with transform/opacity only, like .tree-fx: composited,
+  // nothing animates inside the tree SVG.
+  const DAYS_PER_LANTERN = 7;
+  const MAX_LANTERNS = 8;
+  const LANTERN_SVG =
+    '<svg viewBox="0 0 16 22" width="15" height="21" aria-hidden="true">' +
+    '<rect x="6" y="0.5" width="4" height="2.5" rx="1" fill="#6B4423"/>' +
+    '<path d="M3.2 3.4 Q8 2.2 12.8 3.4 Q15.6 10 12.8 17.4 Q8 18.8 3.2 17.4 Q0.4 10 3.2 3.4Z" fill="#F2A23A"/>' +
+    '<path d="M5.4 4 Q8 3.4 10.6 4 Q12.6 10 10.6 16.8 Q8 17.4 5.4 16.8 Q3.4 10 5.4 4Z" fill="#FFD36E"/>' +
+    '<ellipse cx="8" cy="10.4" rx="2.2" ry="4.2" fill="#FFF4C2"/>' +
+    '<rect x="5.5" y="17.6" width="5" height="2.4" rx="1" fill="#6B4423"/>' +
+    '</svg>';
+
+  // Light i's spot around the canopy — golden-angle scatter so any count
+  // spreads evenly, and the same index always lands in the same place.
+  function streakLightPos(i) {
+    const a = i * 2.39996 + 0.6;
+    const r = 0.72 + 0.28 * ((i * 0.618034) % 1); // towards the canopy's edge, clear of the almonds
+    return { x: 50 + Math.cos(a) * r * 46, y: 42 + Math.sin(a) * r * 38 };
+  }
+
+  function streakLightCounts(streak) {
+    const lanterns = Math.min(MAX_LANTERNS, Math.floor(streak / DAYS_PER_LANTERN));
+    return { lanterns, fireflies: streak % DAYS_PER_LANTERN };
+  }
+
+  // `fromStreak` (growth replay): the streak at the last visit — lights
+  // earned since then fly in, and fireflies that completed a week merge
+  // into their new lantern.
+  function renderStreakLights(data, fromStreak) {
+    const streak = data.streak || 0;
+    const layer = document.createElement("div");
+    layer.className = `streak-lights${data.streakState === "waiting" ? " is-waiting" : ""}`;
+    layer.setAttribute("aria-hidden", "true");
+    $treeContainer.appendChild(layer);
+    if (streak <= 0) return;
+
+    const now = streakLightCounts(streak);
+    const replaying = typeof fromStreak === "number" && fromStreak < streak;
+    const was = streakLightCounts(replaying ? Math.max(0, fromStreak) : streak);
+    const newLantern = replaying && now.lanterns > was.lanterns;
+    let delay = 0.9; // after the replay's opening beat
+    const nextDelay = () => { const d = delay; delay += 0.45; return d; };
+
+    // Fireflies that just completed a week gather into their lantern.
+    if (newLantern) {
+      const target = streakLightPos(was.lanterns);
+      for (let j = 0; j < was.fireflies; j++) {
+        const from = streakLightPos(was.lanterns + j);
+        const ghost = document.createElement("span");
+        ghost.className = "streak-light is-firefly is-merging";
+        ghost.style.cssText =
+          `--x0:${from.x.toFixed(1)}%; --y0:${from.y.toFixed(1)}%; --x1:${target.x.toFixed(1)}%; --y1:${target.y.toFixed(1)}%;` +
+          `animation-delay:${(delay + j * 0.08).toFixed(2)}s`;
+        ghost.innerHTML = '<span class="sl-drift"><span class="sl-glow"></span></span>';
+        layer.appendChild(ghost);
+      }
+      if (was.fireflies) delay += 1.1;
+    }
+
+    const total = now.lanterns + now.fireflies;
+    for (let i = 0; i < total; i++) {
+      const isLantern = i < now.lanterns;
+      const arriving = replaying && (isLantern
+        ? i >= was.lanterns
+        : newLantern || (i - now.lanterns) >= was.fireflies);
+      const pos = streakLightPos(i);
+      const light = document.createElement("span");
+      light.className = `streak-light ${isLantern ? "is-lantern" : "is-firefly"}${arriving ? " is-arriving" : ""}`;
+      const fromX = (((i * 53) % 120) - 60).toFixed(0);
+      light.style.cssText =
+        `left:${pos.x.toFixed(1)}%; top:${pos.y.toFixed(1)}%;` +
+        `--drift-dur:${(4.5 + (i % 4) * 0.8).toFixed(1)}s; --drift-delay:-${((i * 1.7) % 5).toFixed(1)}s;` +
+        `--from-x:${fromX}px; --from-y:${70 + (i * 29) % 50}px` +
+        (arriving ? `; animation-delay:${nextDelay().toFixed(2)}s` : "");
+      light.innerHTML = `<span class="sl-drift"><span class="sl-glow">${isLantern ? LANTERN_SVG : ""}</span></span>`;
+      layer.appendChild(light);
+    }
+  }
+
+  // One plain line under the tree saying what the lights mean — and, if
+  // today hasn't been read yet, what to do to keep them.
+  function renderStreakHint(data) {
+    if (!$streakHint) return;
+    const streak = data.streak || 0;
+    const state = data.streakState || (streak > 0 ? "lit" : "none");
+    let html;
+    if (state === "waiting" && streak > 0) {
+      html = `<strong>Keep your lights glowing</strong> — read today's email to make it a ${streak + 1}-day streak`;
+    } else if (state === "broken") {
+      html = `<strong>Your fireflies flew off</strong> — read today's email to light the first one again`;
+    } else if (streak > 0) {
+      html = `<strong>${streak}-day streak</strong> · a firefly a day, a lantern a week`;
+    } else {
+      html = `Read today's email to light your first firefly`;
+    }
+    $streakHint.innerHTML = `<span class="streak-hint-dot" aria-hidden="true"></span><span>${html}</span>`;
+    $streakHint.classList.toggle("is-waiting", state === "waiting" || state === "broken");
+    $streakHint.hidden = false;
+  }
+
+  // ── Stage-up celebration ──
+  // A burst of golden sparks and petals from the canopy, a ring of light,
+  // the stage name popping — and on the stage you've landed on, a "New
+  // stage!" ribbon on the banner. HTML/CSS only, removed once it's played.
+  function celebrateStage(stageIndex, isLanding) {
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const stages = window.AlmondTree.stages;
+    const fullyGrown = stageIndex === stages.length - 1;
+
+    if (!reduceMotion) {
+      const burst = document.createElement("div");
+      burst.className = `stage-burst${isLanding ? " is-landing" : ""}`;
+      burst.setAttribute("aria-hidden", "true");
+      let sparks = '<span class="sb-flash"></span><span class="sb-ring"></span>';
+      const count = isLanding ? 18 : 12;
+      for (let k = 0; k < count; k++) {
+        const angle = (360 / count) * k + ((k * 37) % 13);
+        const dist = (isLanding ? 70 : 50) + ((k * 41) % 45);
+        const kind = k % 3 === 0 ? "is-petal" : "";
+        sparks += `<span class="sb-spark ${kind}" style="--a:${angle.toFixed(0)}deg; --dist:${dist}px; animation-delay:${((k % 4) * 0.04).toFixed(2)}s"></span>`;
+      }
+      burst.innerHTML = sparks;
+      $treeContainer.appendChild(burst);
+      setTimeout(() => burst.remove(), 1700);
+
+      $stageName.classList.remove("stage-pop");
+      void $stageName.offsetWidth; // restart the animation
+      $stageName.classList.add("stage-pop");
+    }
+
+    if (isLanding && $stageBanner) {
+      const old = $stageBanner.querySelector(".stage-new-chip");
+      if (old) old.remove();
+      const chip = document.createElement("span");
+      chip.className = "stage-new-chip";
+      chip.textContent = fullyGrown ? "Fully grown!" : "New stage!";
+      $stageBanner.appendChild(chip);
+      setTimeout(() => chip.classList.add("is-leaving"), 4200);
+      setTimeout(() => chip.remove(), 4800);
+    }
   }
 
   // ── Stats Rendering ──
@@ -957,7 +1125,20 @@
         const fromPoints = stages[Math.max(0, currentData.stage.index - 3)].need;
         if (fromPoints >= currentData.points) return;
         const threeDaysAgo = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 19).replace("T", " ");
-        playGrowthReplay(currentData, { fromPoints, harvestedSince: 0, at: threeDaysAgo }, ++renderRequestId);
+        const fromStreak = Math.max(0, currentData.streak - 3);
+        playGrowthReplay(currentData, { fromPoints, fromStreak, harvestedSince: 0, at: threeDaysAgo }, ++renderRequestId);
+      });
+    }
+
+    // Preview the streak states a real reader can be in (see streakStatus).
+    const $streakStates = document.getElementById("demo-streak-states");
+    if ($streakStates) {
+      $streakStates.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-state]");
+        if (!btn) return;
+        demoStreakState = btn.dataset.state;
+        $streakStates.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+        fetchAndRender(currentStage >= 0 ? currentStage : 0);
       });
     }
   }

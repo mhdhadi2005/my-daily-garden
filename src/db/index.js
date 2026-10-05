@@ -48,6 +48,7 @@ const ADDED_COLUMNS = [
   // replay how much the tree grew since then. NULL until their first view.
   ["subscribers", "last_viewed_points", "INTEGER"],
   ["subscribers", "last_viewed_harvests", "INTEGER"],
+  ["subscribers", "last_viewed_streak", "INTEGER"],
   ["subscribers", "last_viewed_at", "TEXT"],
 ];
 

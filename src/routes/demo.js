@@ -33,7 +33,11 @@ router.get("/api/demo/tree", (req, res) => {
   }
 
   const points = req.query.points !== undefined ? parseInt(req.query.points, 10) : calculatedPoints;
-  const streak = req.query.streak !== undefined ? parseInt(req.query.streak, 10) : stageIndex + 1;
+  // ?streakState=waiting|broken previews a reader who hasn't engaged today
+  // (lights dimmed) or who missed a day (lights gone) — see streakStatus.
+  const streakState = ["waiting", "broken"].includes(req.query.streakState) ? req.query.streakState : "lit";
+  const baseStreak = req.query.streak !== undefined ? parseInt(req.query.streak, 10) : stageIndex + 1;
+  const streak = streakState === "broken" ? 0 : baseStreak;
 
   const rewards = [];
   if (stageIndex >= 1) rewards.push({ reward_type: "butterfly", count: stageIndex * 2 });
@@ -63,8 +67,9 @@ router.get("/api/demo/tree", (req, res) => {
   res.json({
     points,
     streak,
-    longestStreak:    streak + 5,
-    totalEngagedDays: streak + 18,
+    streakState,
+    longestStreak:    baseStreak + 5,
+    totalEngagedDays: baseStreak + 18,
     stage:            { index: stageIndex, name: currentStage.name },
     nextStage:        nextStageInfo ? { name: nextStageInfo.name, pointsNeeded: Math.max(0, nextStageInfo.need - points) } : null,
     rewards,

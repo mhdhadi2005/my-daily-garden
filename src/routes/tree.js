@@ -1,6 +1,6 @@
 const express = require("express");
 const { db } = require("../db");
-const { STAGES, COSMETICS, stageForPoints, POINT_VALUES } = require("../engine/config");
+const { STAGES, COSMETICS, stageForPoints, POINT_VALUES, streakStatus } = require("../engine/config");
 
 
 const router = express.Router();
@@ -50,9 +50,12 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
   const cosmeticMap = Object.fromEntries(COSMETICS.map(c => [c.type, c]));
   const cosmeticsEnriched = cosmeticRows.map(r => cosmeticMap[r.cosmetic_type] || { type: r.cosmetic_type, label: r.cosmetic_type, icon: "🎁", rarity: "common" });
 
+  const streak = streakStatus(sub);
+
   res.json({
     points:           sub.points,
-    streak:           sub.streak,
+    streak:           streak.streak,
+    streakState:      streak.state,
     longestStreak:    sub.longest_streak,
     totalEngagedDays: sub.total_engaged_days,
     stage:            { index: stageIdx, name: stage.name },
@@ -70,7 +73,8 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
     // What they saw last visit, for the "grown since you were last here"
     // replay. null on a first visit.
     lastView: sub.last_viewed_at
-      ? { points: sub.last_viewed_points, totalHarvests: sub.last_viewed_harvests, at: sub.last_viewed_at }
+      ? { points: sub.last_viewed_points, totalHarvests: sub.last_viewed_harvests,
+          streak: sub.last_viewed_streak, at: sub.last_viewed_at }
       : null,
   });
 });
@@ -81,14 +85,17 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
 // Kept separate from the GET so reloads/refetches can't silently consume a
 // replay the reader never actually watched.
 router.post("/api/tree/:beehiivSubscriberId/viewed", (req, res) => {
-  const result = db
-    .prepare(`UPDATE subscribers
+  const sub = db
+    .prepare("SELECT * FROM subscribers WHERE beehiiv_subscriber_id = ?")
+    .get(req.params.beehiivSubscriberId);
+  if (!sub) return res.status(404).json({ error: "subscriber not found" });
+  db.prepare(`UPDATE subscribers
                  SET last_viewed_points = points,
                      last_viewed_harvests = total_harvests,
+                     last_viewed_streak = ?,
                      last_viewed_at = datetime('now')
-               WHERE beehiiv_subscriber_id = ?`)
-    .run(req.params.beehiivSubscriberId);
-  if (!result.changes) return res.status(404).json({ error: "subscriber not found" });
+               WHERE id = ?`)
+    .run(streakStatus(sub).streak, sub.id);
   res.status(204).end();
 });
 

@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const { db } = require("../db");
-const { STAGES, stageForPoints } = require("../engine/config");
+const { STAGES, stageForPoints, streakStatus } = require("../engine/config");
 
 const router = express.Router();
 
@@ -65,7 +65,7 @@ router.post("/api/wp/tree-status", (req, res) => {
   res.json({
     linked: true,
     points: sub.points,
-    streak: sub.streak,
+    streak: streakStatus(sub).streak,
     stage: stage.name,
     nextStage: nextStage ? { name: nextStage.name, pointsNeeded: nextStage.need - sub.points } : null,
   });
