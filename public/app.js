@@ -145,6 +145,7 @@
 
     const newStage    = data.stage.index;
     const shouldAnimate = newStage !== currentStage;
+    const firstLoad   = currentStage < 0;
 
     if (shouldAnimate && currentStage >= 0) {
       $treeContainer.classList.add("fade-out");
@@ -175,11 +176,63 @@
 
     currentStage = newStage;
 
-    if (isRealMode) {
-      const replay = takeReplayFor(data);
-      if (replay) await playGrowthReplay(data, replay, requestId);
-      if (requestId === renderRequestId) markViewed();
+    // Every open gets a moment: the full growth replay when the tree has
+    // grown since the last visit, otherwise a short greeting.
+    const replay = isRealMode ? takeReplayFor(data) : null;
+    if (replay) await playGrowthReplay(data, replay, requestId);
+    else if (firstLoad) playGreeting(data, false);
+    if (isRealMode && requestId === renderRequestId) markViewed();
+  }
+
+  // ── Greeting (every open without new growth) ──
+  // Shorter and quieter than the replay so the two never compete: the
+  // tree pops in, its streak lights rise out of the grass to their spots,
+  // then the tree gives a little rustle that shakes loose a few leaves and
+  // the stage name pops. ~2s, all composited.
+  const GREET_LEAF_COLORS = {
+    blossom: "#F7B8C4", white: "#FFFFFF", autumn: "#C0702A",
+    spring: "#8BC34A", summer: "#3E8E5A", golden: "#E8B93A",
+  };
+
+  function playGreeting(data, rerender) {
+    const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return;
+    if (rerender) {
+      renderTree(data, true);
+      sizeCurrentTree(data.stage.index);
     }
+
+    $treeContainer.querySelectorAll(".streak-light:not(.is-merging)").forEach((light, k) => {
+      light.classList.add("is-greeting");
+      light.style.animationDelay = `${(0.45 + k * 0.12).toFixed(2)}s`;
+    });
+
+    const svg = $treeContainer.querySelector("svg");
+    setTimeout(() => {
+      if (!svg || !svg.isConnected) return; // re-rendered meanwhile
+      svg.classList.remove("tree-enter");
+      svg.classList.add("tree-rustle");
+
+      if (data.stage.index >= 1) {
+        const color = GREET_LEAF_COLORS[treeLook(currentTreeNumber(data))] || "#3E8E5A";
+        const leaves = document.createElement("div");
+        leaves.className = "greet-leaves";
+        leaves.setAttribute("aria-hidden", "true");
+        for (let i = 0; i < 5; i++) {
+          const leaf = document.createElement("span");
+          leaf.style.cssText =
+            `left:${22 + i * 14 + ((i * 7) % 5)}%; top:${24 + ((i * 13) % 18)}%; background:${color};` +
+            `--drift:${((i % 2 ? 1 : -1) * (10 + i * 4))}px; animation-delay:${(0.1 + i * 0.13).toFixed(2)}s`;
+          leaves.appendChild(leaf);
+        }
+        $treeContainer.appendChild(leaves);
+        setTimeout(() => leaves.remove(), 3000);
+      }
+
+      $stageName.classList.remove("stage-pop");
+      void $stageName.offsetWidth; // restart the animation
+      $stageName.classList.add("stage-pop");
+    }, 1000);
   }
 
   // ── "Grown since your last visit" replay ──
@@ -1127,6 +1180,15 @@
         const threeDaysAgo = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 19).replace("T", " ");
         const fromStreak = Math.max(0, currentData.streak - 3);
         playGrowthReplay(currentData, { fromPoints, fromStreak, harvestedSince: 0, at: threeDaysAgo }, ++renderRequestId);
+      });
+    }
+
+    const $greetBtn = document.getElementById("demo-greet-btn");
+    if ($greetBtn) {
+      $greetBtn.addEventListener("click", () => {
+        if (!currentData) return;
+        ++renderRequestId; // cancel any replay still stepping
+        playGreeting(currentData, true);
       });
     }
 

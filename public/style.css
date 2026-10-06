@@ -1104,8 +1104,69 @@ body {
   to   { transform: translateX(-50%) scale(0.6); opacity: 0; }
 }
 
+/* ── Everyday greeting (see playGreeting) ── */
+.demo-replay-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.demo-replay-btn.is-secondary {
+  color: var(--amber-text);
+  background: #fff;
+  border: 1px solid var(--amber-text);
+}
+
+/* Lights rising out of the grass to their spots, one after another. */
+.streak-light.is-greeting {
+  animation: slGreet 0.9s var(--ease-out) both;
+}
+@keyframes slGreet {
+  0%   { transform: translate(calc(var(--from-x, 0px) * 0.4), calc(var(--from-y, 80px) * 0.7)) scale(0.3); opacity: 0; }
+  20%  { opacity: 1; }
+  70%  { transform: translate(0, 0) scale(1.25); }
+  100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+
+/* A little shake of the whole tree, from the base. */
+.tree-container svg.tree-rustle {
+  transform-origin: 50% 96%;
+  animation: treeRustle 1.3s ease-in-out;
+}
+@keyframes treeRustle {
+  0%   { transform: rotate(0deg); }
+  18%  { transform: rotate(-1.6deg); }
+  40%  { transform: rotate(1.2deg); }
+  62%  { transform: rotate(-0.7deg); }
+  82%  { transform: rotate(0.3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* A few leaves/petals shaken loose by the rustle, in the tree's colours. */
+.greet-leaves {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.greet-leaves span {
+  position: absolute;
+  width: 9px;
+  height: 7px;
+  border-radius: 70% 0 70% 0;
+  box-shadow: 0 0 1px rgba(38, 42, 69, 0.25);
+  animation: greetFall 2.2s ease-in both;
+}
+@keyframes greetFall {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  12%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(var(--drift, 12px), 150px) rotate(320deg); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .streak-light, .sl-drift, .sl-glow, .is-lantern .sl-glow::before { animation: none !important; }
+  .tree-container svg.tree-rustle { animation: none; }
+  .greet-leaves { display: none; }
   .streak-light.is-merging { display: none; }
   .stage-new-chip { animation: none; }
 }
