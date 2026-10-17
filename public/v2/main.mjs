@@ -143,6 +143,7 @@ function makeStillTree(tree, index) {
 
 $('#still-trees').innerHTML = garden.trees.map(makeStillTree).join('');
 $('#still-seed').toggleAttribute('hidden', currentTreeCount !== 0);
+$('#design-entry').hidden = currentTreeCount === 0;
 $('#collection').hidden = currentTreeCount === 0;
 $('#area').disabled = currentTreeCount === 0;
 $('#area').closest('.area-row').hidden = currentTreeCount === 0;
