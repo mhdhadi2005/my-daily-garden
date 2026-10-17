@@ -35,7 +35,6 @@ if (result.kind !== 'garden') {
 } else {
 $('#access-panel').hidden = true;
 $('#garden-content').hidden = false;
-$('#sample-label').hidden = !result.sample;
 $('#footer-note').textContent = result.sample ? 'Example data. Nothing is saved.' : 'Your garden is private.';
 const garden = result.garden;
 const currentTreeCount = garden.trees.length;
@@ -61,11 +60,15 @@ const areaOptions = $('#area').options;
 for (const option of areaOptions) {
   if (option.value !== 'all') option.disabled = !designMode.areas?.includes(option.value);
 }
-$('#design-entry').addEventListener('click', () => designMode.open?.());
-$('#design-tree').addEventListener('click', () => designMode.openTree?.(garden.trees[selected]?.id));
+$('#design-entry').addEventListener('click', () => { clearTreeSelection(false); designMode.open?.(); });
+$('#design-tree').addEventListener('click', () => {
+  const treeId = garden.trees[selected]?.id;
+  clearTreeSelection(false);
+  designMode.openTree?.(treeId);
+});
 $('#features-pending').textContent = designMode.error
   ? 'Garden design is unavailable right now.'
-  : result.sample ? 'Example forest. Design changes stay on this page.'
+  : result.sample ? 'Preview only. Changes reset on refresh.'
   : 'Sharing will open when newsletter totals are verified.';
 $('#share-entry').addEventListener('click', async () => {
   const button = $('#share-entry');
@@ -212,14 +215,16 @@ $('#tree-list').addEventListener('click', event => {
   const button = event.target.closest('[data-tree]');
   if (button) selectTree(Number(button.dataset.tree));
 });
-$('#close-tree').addEventListener('click', () => {
+function clearTreeSelection(focusList = true) {
+  if (selected < 0) return;
   $('#tree-detail').hidden = true;
   forest?.setArea($('#area').value);
-  document.querySelector(`[data-tree="${selected}"]`)?.focus();
+  if (focusList) document.querySelector(`[data-tree="${selected}"]`)?.focus();
   selected = -1;
   document.querySelectorAll('[data-tree]').forEach(button => button.setAttribute('aria-pressed', 'false'));
   document.querySelectorAll('[data-still-tree]').forEach(item => item.removeAttribute('data-selected'));
-});
+}
+$('#close-tree').addEventListener('click', () => clearTreeSelection());
 function setStillArea(area) {
   const views = { all: '0 0 880 360', meadow: '70 0 490 360', pond: '195 0 490 360', woodland: '320 0 490 360' };
   $('#scene .still-forest').setAttribute('viewBox', views[area] || views.all);

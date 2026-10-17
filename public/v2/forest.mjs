@@ -297,8 +297,8 @@ export function mountForest(host, garden, selectTree) {
 
   function setArea(area) {
     selectionRing.visible = false;
-    const target = { all: [0, .6, 0], meadow: [-2.2, .8, .2], pond: [3.15, .6, 2.35], woodland: [-3.5, .8, 1.8] }[area] || [0, .6, 0];
-    const offset = area === 'all' ? (host.clientWidth < 500 && !distantCount ? [6.2, 5.8, 7.9] : [8, 7.3, 10]) : [5.2, 5.3, 6.7];
+    const target = { all: [0, host.clientWidth < 500 ? .2 : .6, 0], meadow: [-2.2, .8, .2], pond: [3.15, .6, 2.35], woodland: [-3.5, .8, 1.8] }[area] || [0, .6, 0];
+    const offset = area === 'all' ? (distantCount ? [8, 7.3, 10] : host.clientWidth < 320 ? [5.8, 5.5, 7.4] : host.clientWidth < 500 ? [5, 4.8, 6.4] : [6.8, 6.2, 8.5]) : [5.2, 5.3, 6.7];
     controls.target.set(...target);
     camera.position.set(target[0] + offset[0], target[1] + offset[1], target[2] + offset[2]);
     controls.update();

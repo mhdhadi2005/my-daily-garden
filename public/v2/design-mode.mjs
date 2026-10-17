@@ -101,14 +101,20 @@ export async function mountDesignMode({ host, garden, sample, sampleChoice, onSa
 
   function render() {
     const choiceOnly = mode === 'choice';
-    $(panel, '#design-heading').textContent = choiceOnly ? 'A new forest choice' : 'Design Your Garden';
-    $(panel, '#design-intro').textContent = choiceOnly ? 'Choose your new look or forest friend to continue.' : 'Choose a look and place what you have earned.';
+    const choiceCopy = requiredChoices.length === 1
+      ? requiredChoices[0] === 'resident'
+        ? ['Choose your forest friend', 'Who will live among your almond trees?']
+        : ['Choose your blossoms', 'Pick the colour that will bloom across your forest.']
+      : ['New choices for your forest', 'Choose each new reward to continue.'];
+    panel.classList.toggle('choice-mode', choiceOnly);
+    $(panel, '#design-heading').textContent = choiceOnly ? choiceCopy[0] : 'Design Your Garden';
+    $(panel, '#design-intro').textContent = choiceOnly ? choiceCopy[1] : 'Choose a look and place what you have earned.';
     $(panel, '#design-close').hidden = choiceOnly;
     $(panel, '#design-undo').hidden = choiceOnly;
     $(panel, '#design-save').textContent = choiceOnly ? 'Continue to forest' : 'Save garden';
     const choices = $(panel, '#design-choices'); choices.replaceChildren();
     if (draft.availablePalettes.length && (!choiceOnly || requiredChoices.includes('palette'))) {
-      choices.append(renderChoice('palette', 'Blossom colour', draft.availablePalettes,
+      choices.append(renderChoice('palette', 'Blossom colour for your forest', draft.availablePalettes,
         choiceOnly && !chosenRequired.has('palette') ? null : draft.palette));
     }
     if (draft.availableResidents.length && (!choiceOnly || requiredChoices.includes('resident'))) {
