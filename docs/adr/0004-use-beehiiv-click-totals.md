@@ -1,0 +1,3 @@
+# Use Beehiiv totals for newsletter click growth
+
+My Daily Garden v2 will use Beehiiv's subscriber-level aggregate click data rather than add tracked article links. A daily comparison with each reader's last successful count can award capped new clicks and support a streak of positive reports; a failed read pauses scoring. This keeps the integration simple, but rewards and reports cannot claim a distinct article or the click's exact day. This supersedes ADR-0002; before a pilot, verify that the required cumulative click field is available and stable through the production API, then dry-run the revised earning pace.

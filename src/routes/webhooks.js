@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
-const { db } = require("../db");
-const { recordClick, recordOpen, recordQuizAnswer, recordPurchase } = require("../engine");
+const { recordClick, recordOpen, recordQuizAnswer } = require("../engine");
+const { creditCompletedPurchase } = require("../v2-purchases");
 
 
 const router = express.Router();
@@ -18,7 +18,7 @@ const router = express.Router();
 // X-MDG-Secret with this same value as BEEHIIV_WEBHOOK_SECRET.
 function verifySignature(req) {
   const secret = process.env.BEEHIIV_WEBHOOK_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
+  if (!secret) return false;
   const provided = req.headers["x-mdg-secret"];
   if (!provided) return false;
   const a = Buffer.from(provided);
@@ -61,8 +61,9 @@ router.post("/webhooks/beehiiv/open", (req, res) => {
 // POST /api/seed-subscriber — admin-only route to manually create a subscriber
 // Protected by BEEHIIV_WEBHOOK_SECRET as a bearer token.
 router.post("/api/seed-subscriber", (req, res) => {
+  const secret = process.env.BEEHIIV_WEBHOOK_SECRET;
   const auth = (req.headers["authorization"] || "").replace("Bearer ", "");
-  if (auth !== process.env.BEEHIIV_WEBHOOK_SECRET) {
+  if (!secret || auth !== secret) {
     return res.status(401).json({ error: "unauthorized" });
   }
   const { subscriber_id, email } = req.body || {};
@@ -79,7 +80,7 @@ router.post("/api/seed-subscriber", (req, res) => {
 // unlimited purchase points for free.
 function verifyWooSignature(req) {
   const secret = process.env.WC_WEBHOOK_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
+  if (!secret) return false;
   const signature = req.headers["x-wc-webhook-signature"];
   if (!signature || !req.rawBody) return false;
   const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("base64");
@@ -93,29 +94,14 @@ function verifyWooSignature(req) {
 // POST /webhooks/purchase — WooCommerce / store purchase webhook
 router.post("/webhooks/purchase", (req, res) => {
   if (!verifyWooSignature(req)) return res.status(401).json({ error: "invalid signature" });
-
-  const { subscriber_id, email, order_id, total, amount } = req.body || {};
-  if (!subscriber_id && !email) {
-    return res.status(400).json({ error: "missing subscriber_id or email" });
+  try {
+    const result = creditCompletedPurchase(req.body);
+    if (result.status === "invalid_order") return res.status(400).json({ error: "invalid order id" });
+    res.json({ ok: true, result });
+  } catch (error) {
+    console.error("Purchase credit failed:", error.name);
+    res.status(500).json({ error: "purchase credit failed" });
   }
-
-  let beehiivId = subscriber_id;
-  if (!beehiivId && email) {
-    const sub = db.prepare("SELECT beehiiv_subscriber_id FROM subscribers WHERE email = ?").get(email);
-    if (sub) beehiivId = sub.beehiiv_subscriber_id;
-  }
-  if (!beehiivId) {
-    beehiivId = `sub_${Date.now()}`;
-  }
-
-  const result = recordPurchase({
-    beehiivSubscriberId: beehiivId,
-    email: email || "",
-    orderId: order_id,
-    amount: total || amount,
-  });
-
-  res.json({ ok: true, result });
 });
 
 module.exports = router;

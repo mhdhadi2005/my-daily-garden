@@ -16,7 +16,7 @@ const SHARED_SECRET = process.env.WP_APP_SHARED_SECRET;
 const MAX_REQUEST_AGE_SECONDS = 60; // rejects replayed requests older than this
 
 function verifyWpSignature(req) {
-  if (!SHARED_SECRET) return process.env.NODE_ENV !== "production"; // dev-only bypass
+  if (!SHARED_SECRET) return false;
   const signature = req.headers["x-wp-signature"];
   const timestamp = req.headers["x-wp-timestamp"];
   if (!signature || !timestamp) return false;

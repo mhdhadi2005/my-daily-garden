@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "prototype:v2": "python3 -m http.server 8778 --bind 127.0.0.1 --directory experiments",
     "test": "node src/smoke-test.js",
     "verify:beehiiv": "node src/verify-beehiiv.js",
     "verify:wp": "node src/verify-wp-connector.js"
