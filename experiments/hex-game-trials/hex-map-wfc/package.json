@@ -1,0 +1,1 @@
+{"name":"almond-wfc-trial","private":true,"type":"module","scripts":{"test":"node verify.mjs"}}

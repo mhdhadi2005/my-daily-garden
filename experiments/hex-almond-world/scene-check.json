@@ -1,0 +1,22 @@
+{
+  "verdict": "pass",
+  "blender": "5.2.2 LTS",
+  "tiles": 7,
+  "main_trees": 6,
+  "mesh_objects": 38,
+  "saved_camera_frame": {
+    "left": 0.1063183918595314,
+    "right": 0.8936820030212402,
+    "bottom": 0.07627101987600327,
+    "top": 0.9237286448478699
+  },
+  "sha256": {
+    "seven-hex-world.blend": "8123b13d0d0c46bb6b246d3ff51ff9a7a8a028511247236d72439caa24b07334",
+    "seven-hex-world.glb": "317babdc08e9b81e0b1b6022cb6359e6b4a4ec421aa18ad8ebe73fd00c10d810",
+    "seven-hex-world.png": "ac9154a42ef2f466c36da19cad21d02f27bd88fdbaa15571f6910291169a281b",
+    "seven-hex-portrait.png": "0c50e2b0b0b716d7fd5b51f3efdb46df6354733e8c2ed1bce519c09c78f24031"
+  },
+  "limits": [
+    "Checks saved scene structure, palette values and camera framing; visual approval remains subjective."
+  ]
+}

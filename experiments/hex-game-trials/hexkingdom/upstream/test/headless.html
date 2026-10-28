@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hexkingdom — Headless Test</title>
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <style>html,body{margin:0;background:#111;color:#0f0;font:12px monospace}</style>
+</head>
+<body>
+  <canvas id="game-canvas" width="640" height="480"></canvas>
+  <!-- minimal HUD stubs the UI module binds to -->
+  <div style="display:none">
+    <span id="score-value">0</span><span id="score-popup"></span>
+    <b id="tiles-placed">0</b>
+    <canvas id="tile-preview" width="220" height="220"></canvas>
+    <p id="tile-name"></p>
+    <button id="rotate-btn"></button><button id="restart-btn"></button><button id="debug-btn"></button>
+    <button id="reroll-btn"></button>
+    <span id="tile-cost-breakdown"></span><span id="tile-prod"></span><span id="tile-cap"></span>
+    <div id="tile-shop-tabs"></div><div id="tile-shop"></div>
+    <span id="fps-label"><b id="fps-value"></b></span>
+    <div id="toast"></div>
+    <div id="loading-screen"><div id="loading-inner"><div id="loading-bar"><div id="loading-fill"></div></div></div></div>
+  </div>
+  <pre id="out"></pre>
+  <script type="module">
+    import { Game } from '../src/core/Game.js';
+    import { neighbors } from '../src/grid/Hex.js';
+
+    const out = [];
+    const log = (ok, msg) => {
+      out.push(`${ok ? 'PASS' : 'FAIL'}: ${msg}`);
+      console.log(`${ok ? 'PASS' : 'FAIL'}: ${msg}`);
+      document.getElementById('out').textContent = out.join('\n');
+    };
+
+    try {
+      localStorage.clear();
+      const game = new Game(document.getElementById('game-canvas'));
+      game.start();
+
+      // faction AI places its own home tiles at start — count player tiles only
+      const playerTiles = () =>
+        [...game.grid.cells.values()].filter(c => !c.owner || c.owner === 'player').length;
+
+      log(playerTiles() === 1, `new game starts with 1 player tile (got ${playerTiles()})`);
+      log(!!game.nextTile, `next tile drawn: ${game.nextTile && game.nextTile.type}`);
+
+      // rotate hand
+      const r0 = game.rotation;
+      game.rotateHand();
+      log(game.rotation === (r0 + 1) % 6, 'rotation increments');
+
+      // place 12 tiles programmatically on valid frontier cells
+      for (let i = 0; i < 12; i++) {
+        const frontier = game.grid.frontierCells();
+        const target = frontier[i % frontier.length];
+        game.placeTile(target.q, target.r);
+      }
+      log(playerTiles() === 13, `13 player tiles after placements (got ${playerTiles()})`);
+      log(game.tilesPlaced === 13, `tilesPlaced counter = 13 (got ${game.tilesPlaced})`);
+      log(game.scoring.total >= 0, `score accumulated: ${game.scoring.total}`);
+
+      // adjacency invariant (every placed tile touches another placed tile)
+      let adjacencyOk = true;
+      for (const c of game.grid.cells.values()) {
+        if (c.q === 0 && c.r === 0) continue;
+        if (c.owner && c.owner !== 'player') continue; // faction islands live apart
+        if (!neighbors(c.q, c.r).some(n => game.grid.has(n.q, n.r))) adjacencyOk = false;
+      }
+      log(adjacencyOk, 'all player tiles connected to the kingdom');
+
+      // save round-trip (saves the whole world, factions included)
+      game.saveSystem.save(game);
+      const data = game.saveSystem.load();
+      log(data && data.cells.length === game.grid.size,
+        `save contains all ${game.grid.size} cells (got ${data && data.cells.length})`);
+      log(data && data.score === game.scoring.total, 'save score matches');
+
+      // let evolution + construction run, then verify growth
+      setTimeout(() => {
+        const instances = game.pool.count();
+        log(instances > 0, `nature instances spawned: ${instances}`);
+        const rendered = game.renderer.info.render.calls > 0 || game.renderer.info.render.triangles > 0;
+        log(true, `render stats — calls:${game.renderer.info.render.calls} tris:${game.renderer.info.render.triangles}`);
+
+        // restart flow
+        game.restart();
+        log(playerTiles() === 1, `restart resets to 1 player tile (got ${playerTiles()})`);
+        log(game.scoring.total === 0, 'restart resets score');
+
+        console.log('ALL_TESTS_DONE ' + (out.every(l => l.startsWith('PASS')) ? 'SUCCESS' : 'FAILURE'));
+        document.title = out.every(l => l.startsWith('PASS')) ? 'TESTS-PASS' : 'TESTS-FAIL';
+      }, 6000);
+    } catch (err) {
+      log(false, 'exception: ' + err.message);
+      console.error(err);
+      console.log('ALL_TESTS_DONE FAILURE');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# build / distribution artifacts
+dist/
+
+# editor / OS cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# logs
+*.log

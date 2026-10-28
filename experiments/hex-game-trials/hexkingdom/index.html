@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff2d9">
+  <title>Almond Hexkingdom · game trial</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #262a45; background: #fff2d9; color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 620px; height: 100svh; display: grid; grid-template: auto minmax(220px, 1fr) auto / minmax(0, 1fr); }
+    header, footer { padding: 16px 24px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin: 0 0 4px; }
+    h1 { font-size: clamp(20px, 3vw, 29px); letter-spacing: -.04em; margin: 0; }
+    .stats { display: flex; gap: 20px; font-size: 11px; }
+    .stats strong { display: block; font-size: 23px; font-variant-numeric: tabular-nums; }
+    #viewport { position: relative; min-width: 0; min-height: 0; margin: 0 8px; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; border-radius: 18px; }
+    canvas:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #cf7600; outline-offset: 3px; }
+    #message { position: absolute; bottom: 7px; left: 12px; right: 12px; margin: 0; padding: 7px 10px; text-align: center; border-radius: 12px; background: #fff9ecdc; font-size: 12px; pointer-events: none; }
+    #message.error { color: #9b2929; background: #fff9ec; padding: 20px; }
+    footer { background: #fff9ed; border-top: 1px solid #262a4512; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+    #tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+    button { font: inherit; font-size: 12px; font-weight: 650; color: inherit; border: 1px solid #262a4533; padding: 10px 13px; border-radius: 999px; background: #fffdf9; cursor: pointer; }
+    button:hover { border-color: #262a45; }
+    button[aria-pressed="true"] { background: #ffa01e; border-color: #e38500; }
+    button:disabled { opacity: .45; cursor: wait; }
+    .controls { margin-left: auto; display: flex; gap: 6px; }
+    #edges { display: inline-flex; align-items: center; gap: 3px; padding-inline: 4px; }
+    .edge { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #262a4525; }
+    .forest { background: #408d42; }
+    .field { background: #eacb71; }
+    .instructions { font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+    .attribution { font-size: 10px; line-height: 1.45; margin: 8px 0 0; opacity: .78; }
+    a { color: inherit; }
+    @media (max-width: 600px) {
+      header, footer { padding: 13px 15px; }
+      .stats { gap: 12px; }
+      .stats strong { font-size: 20px; }
+      h1 { max-width: 190px; }
+      button { padding: 10px 11px; font-size: 11px; }
+      .toolbar { gap: 7px; }
+      .controls { margin-left: 0; }
+      .instructions { font-size: 11px; }
+      #message { font-size: 11px; }
+    }
+  </style>
+  <script type="importmap">{ "imports": { "three": "../../../public/v2/vendor/three.module.js" } }</script>
+</head>
+<body>
+  <header>
+    <div><p class="eyebrow">Throwaway game trial · 10almonds</p><h1>Almond Hexkingdom</h1></div>
+    <div class="stats" aria-live="polite">
+      <div><strong id="tile-count">7</strong>tiles</div>
+      <div><strong id="score">0</strong>trial points</div>
+    </div>
+  </header>
+  <main id="viewport" aria-label="Playable almond tile placement world">
+    <p id="message" role="status">Loading the authored Blender tiles…</p>
+  </main>
+  <footer>
+    <div class="toolbar">
+      <div id="tiles" role="group" aria-label="Choose the tile to place"></div>
+      <span id="edges" aria-label="Selected tile edge types"></span>
+      <div class="controls">
+        <button id="rotate" type="button" disabled>Rotate · 0°</button>
+        <button id="overview" type="button" disabled>Overview</button>
+        <button id="restart" type="button" disabled>Restart trial</button>
+      </div>
+    </div>
+    <p class="instructions">Hover or tap an outlined hex for a see-through 3D preview and points. Click or tap it again to plant. Green neighbour outlines match; coral outlines differ. Match green woodland or gold meadow edge markers. Drag to orbit; pinch or scroll to zoom. R rotates the preview. Arrow keys choose a hex; Enter previews or plants.</p>
+    <p class="attribution">Adapted from <a href="https://github.com/Leks2000/Hexkingdom">Hexkingdom by Aleksandr (Leks2000)</a> · <a href="LICENSE">MIT</a> · <a href="PROVENANCE.md">Reuse details</a>. Authored Blender almond tiles. This tab only; refreshing starts again. Trial points are separate from reader rewards.</p>
+  </footer>
+  <script type="module" src="main.mjs?v=5"></script>
+</body>
+</html>

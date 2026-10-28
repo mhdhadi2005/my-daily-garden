@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hexkingdom — Medieval Hex Kingdom Builder</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 29,9.5 29,22.5 16,30 3,22.5 3,9.5' fill='%238fb35a' stroke='%235a3d26' stroke-width='2'/%3E%3Crect x='11' y='14' width='10' height='9' fill='%23e8dcc0'/%3E%3Cpolygon points='9,15 16,8 23,15' fill='%23b0523a'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game-canvas" aria-label="Hexkingdom game world"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <header id="hud-top" class="ui-panel">
+    <h1 id="game-title">Hexkingdom</h1>
+    <section id="score-panel" aria-live="polite">
+      <span id="score-label">Score</span>
+      <span id="score-value">0</span>
+      <span id="score-popup" class="hidden"></span>
+    </section>
+  </header>
+
+  <aside id="hud-right" class="ui-panel">
+    <section id="next-tile-panel">
+      <h2 class="panel-title">Buy Tile</h2>
+      <p id="tile-cap" class="tile-meta">Tiles: 0 / 14</p>
+      <div id="tile-shop-tabs" class="tile-shop-tabs" role="tablist" aria-label="Tile categories"></div>
+      <div id="tile-shop" class="tile-shop" role="tabpanel" aria-label="Tile catalog"></div>
+      <canvas id="tile-preview" width="220" height="220" aria-label="Selected tile preview"></canvas>
+      <p id="tile-name">—</p>
+      <div id="tile-cost-breakdown" class="tile-cost-breakdown" aria-label="Placement cost"></div>
+      <p id="tile-prod" class="tile-prod"></p>
+      <div class="tile-actions">
+        <button id="reroll-btn" class="ui-btn ui-btn--sm" type="button" aria-label="Shuffle tile edges">⇄ Shuffle</button>
+        <button id="rotate-btn" class="ui-btn ui-btn--sm" type="button" aria-label="Rotate tile">⟳ Rotate</button>
+      </div>
+      <p id="hint-text">Pick tile · click map · R rotate · V shuffle</p>
+    </section>
+  </aside>
+
+  <footer id="hud-bottom" class="ui-panel">
+    <button id="restart-btn" class="ui-btn danger" aria-label="Restart game">↺ Restart</button>
+    <button id="debug-btn" class="ui-btn" aria-label="Toggle debug">⚙ Debug</button>
+    <span id="tiles-placed-label">Tiles: <b id="tiles-placed">0</b></span>
+    <span id="fps-label" class="hidden">FPS: <b id="fps-value">60</b></span>
+  </footer>
+
+  <div id="toast" class="hidden" role="status"></div>
+
+  <div id="loading-screen">
+    <div id="loading-inner">
+      <h1>Hexkingdom</h1>
+      <p>Raising the kingdom…</p>
+      <div id="loading-bar"><div id="loading-fill"></div></div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hexkingdom — Military Makers Smoke Test</title>
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+  <style>html,body{margin:0;background:#111;color:#0f0;font:12px monospace}</style>
+</head>
+<body>
+  <pre id="out"></pre>
+  <script type="module">
+    import * as THREE from 'three';
+    import { Rng } from '../src/core/Rng.js';
+    import { MILITARY_MAKERS, makeCargoProp } from '../src/buildings/MilitaryFactory.js';
+    import { CIVIC_MAKERS } from '../src/buildings/CivicFactory.js';
+    import { BUILDING_MAKERS } from '../src/buildings/BuildingFactory.js';
+
+    const out = [];
+    const log = (ok, msg) => {
+      out.push(`${ok ? 'PASS' : 'FAIL'}: ${msg}`);
+      console.log(`${ok ? 'PASS' : 'FAIL'}: ${msg}`);
+      document.getElementById('out').textContent = out.join('\n');
+    };
+
+    let failures = 0;
+    try {
+      for (const [key, maker] of Object.entries({ ...MILITARY_MAKERS, ...CIVIC_MAKERS })) {
+        try {
+          const rng = new Rng(42);
+          const { group, phases } = maker(rng);
+          const okShape = group instanceof THREE.Group && Array.isArray(phases) && phases.length === 4;
+          // measure bounds with all phases visible
+          for (const p of phases) p.visible = true;
+          const box = new THREE.Box3().setFromObject(group);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const okSize = size.x > 0.01 && size.y > 0.01 && size.z > 0.01 && size.x <= 1.1 && size.z <= 1.1 && size.y <= 1.2;
+          const okRegistry = BUILDING_MAKERS[key] === maker || typeof BUILDING_MAKERS[key] === 'function';
+          if (!(okShape && okSize && okRegistry)) failures++;
+          log(okShape && okSize && okRegistry,
+            `${key} — footprint ${size.x.toFixed(2)}×${size.z.toFixed(2)}, h ${size.y.toFixed(2)}`);
+        } catch (e) {
+          failures++;
+          log(false, `${key} threw: ${e.message}`);
+        }
+      }
+      for (const t of ['food', 'wood', 'stone', 'gold', 'crate']) {
+        const mesh = makeCargoProp(t);
+        const ok = mesh instanceof THREE.Mesh && mesh.geometry.attributes.position.count > 0;
+        if (!ok) failures++;
+        log(ok, `cargo prop '${t}'`);
+      }
+      // config wiring: every building maker + research gate must resolve
+      const { BUILDINGS } = await import('../src/config/BuildingConfig.js');
+      const { RESEARCH } = await import('../src/config/ResearchConfig.js');
+      for (const def of Object.values(BUILDINGS)) {
+        if (def.isRoad) continue;
+        const makerOk = typeof BUILDING_MAKERS[def.maker] === 'function';
+        const researchOk = !def.research || !!RESEARCH[def.research];
+        const upgradeOk = !def.upgradesTo || !!BUILDINGS[def.upgradesTo];
+        if (!(makerOk && researchOk && upgradeOk)) failures++;
+        log(makerOk && researchOk && upgradeOk,
+          `config '${def.id}' → maker '${def.maker}', research '${def.research}'` +
+          (def.upgradesTo ? `, upgrades to '${def.upgradesTo}'` : ''));
+      }
+      // army units: every unit type must resolve to a maker + valid cost
+      const { UNIT_TYPES } = await import('../src/config/EconomyConfig.js');
+      for (const u of Object.values(UNIT_TYPES)) {
+        const ok = typeof BUILDING_MAKERS[u.maker] === 'function' && u.strength > 0
+          && Object.keys(u.cost).length > 0;
+        if (!ok) failures++;
+        log(ok, `unit '${u.id}' → maker '${u.maker}', strength ${u.strength}`);
+      }
+      // research prerequisites must all exist
+      for (const def of Object.values(RESEARCH)) {
+        const ok = (def.requires || []).every((r) => !!RESEARCH[r]);
+        if (!ok) failures++;
+        log(ok, `research '${def.id}' requires [${(def.requires || []).join(', ')}]`);
+      }
+      // upgrade-only buildings must be reachable from some chain root
+      const roots = Object.values(BUILDINGS).filter((d) => d.upgradesTo && !d.upgradeOnly);
+      const reachable = new Set();
+      for (let d of roots) {
+        while (d?.upgradesTo) { reachable.add(d.upgradesTo); d = BUILDINGS[d.upgradesTo]; }
+      }
+      for (const def of Object.values(BUILDINGS)) {
+        if (!def.upgradeOnly) continue;
+        const ok = reachable.has(def.id);
+        if (!ok) failures++;
+        log(ok, `upgrade-only '${def.id}' reachable via chain`);
+      }
+      console.log(failures === 0 ? 'ALL_TESTS_DONE SUCCESS' : 'ALL_TESTS_DONE FAILURE');
+    } catch (e) {
+      log(false, 'fatal: ' + e.message);
+      console.log('ALL_TESTS_DONE FAILURE');
+    }
+  </script>
+</body>
+</html>

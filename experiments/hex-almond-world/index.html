@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fff8e9">
+  <title>Seven-hex almond forest · Blender study</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #262a45; background: #fff8e9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100svh; min-height: 420px; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 32px 8px; }
+    .eyebrow { margin: 0 0 6px; font-size: 11px; font-weight: 750; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(20px, 3vw, 30px); line-height: 1.2; letter-spacing: -.035em; }
+    button { flex-shrink: 0; border: 1px solid #262a45; border-radius: 999px; padding: 11px 17px; background: #fffdf7; color: inherit; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+    button:hover { background: #ffe9be; }
+    button:focus-visible, canvas:focus-visible { outline: 3px solid #d77b00; outline-offset: 4px; }
+    button:disabled { cursor: wait; opacity: .5; }
+    #viewport { position: relative; min-height: 0; min-width: 0; margin: 4px 12px; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; border-radius: 20px; }
+    #status { position: absolute; inset: auto 12px 10px; margin: 0; text-align: center; font-size: 12px; line-height: 1.5; pointer-events: none; }
+    #status.error { inset: 40% 24px auto; border: 1px solid #e6c497; border-radius: 14px; padding: 18px; background: #fffdf7; font-size: 14px; }
+    footer { padding: 10px 32px 22px; font-size: 12px; line-height: 1.5; display: flex; justify-content: space-between; gap: 16px; }
+    footer p { margin: 0; }
+    .palette { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .swatch { width: 15px; height: 15px; border-radius: 50%; border: 1px solid #262a4522; }
+    @media (max-width: 580px) {
+      header { padding: 20px 18px 6px; align-items: flex-start; gap: 10px; }
+      button { padding: 10px 13px; font-size: 12px; }
+      .eyebrow { font-size: 9px; }
+      h1 { max-width: 220px; }
+      footer { padding: 8px 18px 18px; font-size: 11px; }
+      #viewport { margin-inline: 4px; }
+    }
+  </style>
+  <script type="importmap">
+    { "imports": { "three": "../../public/v2/vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">10almonds · Blender study</p>
+      <h1>One little almond world</h1>
+    </div>
+    <button id="reset" type="button" disabled>Reset view</button>
+  </header>
+  <main id="viewport" aria-label="Interactive seven-hex almond forest preview">
+    <p id="status" role="status">Loading the Blender scene…</p>
+  </main>
+  <footer>
+    <p>Seven hexes. One main tree per planted hex.<br>Visual study, not the live garden.</p>
+    <div class="palette" aria-label="Orange, navy, fresh green and blossom pink palette">
+      <span class="swatch" style="background:#ffa01e"></span>
+      <span class="swatch" style="background:#262a45"></span>
+      <span class="swatch" style="background:#83bb58"></span>
+      <span class="swatch" style="background:#f6bfd0"></span>
+    </div>
+  </footer>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from '../../public/v2/vendor/OrbitControls.js';
+    import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
+
+    const viewport = document.querySelector('#viewport');
+    const status = document.querySelector('#status');
+    const reset = document.querySelector('#reset');
+
+    // Project the complete world before fitting, so a portrait viewport cannot crop its edges.
+    function frameCamera(camera, bounds, points, width, height, direction) {
+      const center = bounds.getCenter(new THREE.Vector3());
+      const radius = bounds.getSize(new THREE.Vector3()).length();
+      camera.zoom = 1;
+      camera.position.copy(center).addScaledVector(direction.clone().normalize(), radius * 2 + 5);
+      camera.lookAt(center);
+      camera.updateMatrixWorld(true);
+      const projected = points.map(point => point.clone().applyMatrix4(camera.matrixWorldInverse));
+      const minX = Math.min(...projected.map(point => point.x));
+      const maxX = Math.max(...projected.map(point => point.x));
+      const minY = Math.min(...projected.map(point => point.y));
+      const maxY = Math.max(...projected.map(point => point.y));
+      const offset = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, 0).applyQuaternion(camera.quaternion);
+      camera.position.add(offset);
+      center.add(offset);
+      camera.updateMatrixWorld(true);
+      const halfWidth = (maxX - minX) / 2;
+      const halfHeight = (maxY - minY) / 2;
+      const aspect = width / height;
+      const frameHeight = Math.max(halfHeight, halfWidth / aspect, .1) * 1.1;
+      camera.left = -frameHeight * aspect;
+      camera.right = frameHeight * aspect;
+      camera.top = frameHeight;
+      camera.bottom = -frameHeight;
+      camera.near = .1;
+      camera.far = radius * 5 + 20;
+      camera.updateProjectionMatrix();
+      return center;
+    }
+
+    function showError(message) {
+      status.classList.add('error');
+      status.textContent = message;
+    }
+
+    try {
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor('#fff2d9');
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      renderer.domElement.setAttribute('aria-label', 'Almond trees on seven connected hexagonal tiles. Drag to orbit; scroll or pinch to zoom.');
+      renderer.domElement.tabIndex = 0;
+      viewport.prepend(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, .1, 100);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enablePan = false;
+      controls.minPolarAngle = Math.PI / 10;
+      controls.maxPolarAngle = Math.PI / 2.2;
+      controls.minZoom = .65;
+      controls.maxZoom = 4;
+      scene.add(new THREE.HemisphereLight('#fff9e7', '#b6baa1', 1.8));
+      const key = new THREE.DirectionalLight('#fff1d4', 3);
+      key.position.set(-10, 18, 12);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      key.shadow.normalBias = .04;
+      scene.add(key);
+      scene.add(key.target);
+
+      let bounds;
+      const framePoints = [];
+      const defaultDirection = new THREE.Vector3(10, 10, 13);
+      function fit(resetAngle = false) {
+        const width = viewport.clientWidth;
+        const height = viewport.clientHeight;
+        if (!width || !height) return;
+        renderer.setSize(width, height, false);
+        if (!bounds) return;
+        const direction = resetAngle ? defaultDirection : camera.position.clone().sub(controls.target);
+        controls.target.copy(frameCamera(camera, bounds, framePoints, width, height, direction));
+        controls.update();
+      }
+      new ResizeObserver(() => fit()).observe(viewport);
+      reset.addEventListener('click', () => fit(true));
+      renderer.setAnimationLoop(() => {
+        controls.update();
+        renderer.render(scene, camera);
+      });
+
+      new GLTFLoader().load('./seven-hex-world.glb', ({ scene: world }) => {
+        world.traverse(object => {
+          if (!object.isMesh) return;
+          object.castShadow = true;
+          object.receiveShadow = true;
+        });
+        scene.add(world);
+        bounds = new THREE.Box3().setFromObject(world);
+        if (bounds.isEmpty()) {
+          showError('The exported scene has no visible geometry.');
+          return;
+        }
+        // Per-mesh bounds avoid framing empty space above low terrain on phones.
+        world.traverse(object => {
+          if (!object.isMesh) return;
+          object.geometry.computeBoundingBox();
+          const box = object.geometry.boundingBox;
+          for (const x of [box.min.x, box.max.x]) {
+            for (const y of [box.min.y, box.max.y]) {
+              for (const z of [box.min.z, box.max.z]) {
+                framePoints.push(new THREE.Vector3(x, y, z).applyMatrix4(object.matrixWorld));
+              }
+            }
+          }
+        });
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+        const extent = Math.max(size.x, size.y, size.z);
+        const ground = new THREE.Mesh(
+          new THREE.PlaneGeometry(extent * 5, extent * 5),
+          new THREE.MeshBasicMaterial({ color: '#fff2d9', toneMapped: false })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.set(center.x, bounds.min.y - .035, center.z);
+        scene.add(ground);
+        const shadow = new THREE.Mesh(ground.geometry, new THREE.ShadowMaterial({ opacity: .18 }));
+        shadow.rotation.copy(ground.rotation);
+        shadow.position.copy(ground.position).y += .001;
+        shadow.receiveShadow = true;
+        scene.add(shadow);
+        key.position.copy(center).add(new THREE.Vector3(-extent, extent * 1.8, extent));
+        key.target.position.copy(center);
+        Object.assign(key.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, near: .1, far: extent * 5 });
+        key.shadow.camera.updateProjectionMatrix();
+        fit(true);
+        reset.disabled = false;
+        status.textContent = 'Drag to orbit · scroll or pinch to zoom · reset to see the whole world';
+      }, undefined, error => {
+        console.error('Blender study failed to load:', error);
+        showError('Could not load seven-hex-world.glb. Serve this folder over HTTP and check that the Blender export is present.');
+      });
+    } catch (error) {
+      console.error('Blender study renderer failed:', error);
+      showError('This preview needs WebGL. Please try a browser with hardware acceleration enabled.');
+    }
+  </script>
+</body>
+</html>
