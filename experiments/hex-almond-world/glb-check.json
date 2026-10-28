@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "check": "optimized-glb",
+  "evidenceType": "execution",
+  "verdict": "pass",
+  "checkerReadiness": "ready to run for uncompressed embedded static meshes",
+  "profile": "scene",
+  "budget": {
+    "maxTriangles": 250000
+  },
+  "sha256": "317babdc08e9b81e0b1b6022cb6359e6b4a4ec421aa18ad8ebe73fd00c10d810",
+  "observations": {
+    "fileBytes": 1687516,
+    "activeSceneTriangles": 53896,
+    "meshInstances": 38
+  },
+  "failures": [],
+  "unsupported": [],
+  "notes": [],
+  "limits": [
+    "Does not establish visual quality, distinct tree silhouettes, growth, browser lighting, draw calls, transfer of dependent code, resource memory, or real-device performance.",
+    "Sparse accessors, extensions, morph targets, skins and animation are inconclusive; validate these with an independent glTF validator and browser evidence before accepting their exports.",
+    "Triangle budget applies to the selected exported scene. Supply a tree-only export for near-tree checks; whole clearing and distant-tree profiles have separate limits.",
+    "No minimum triangle count: a visually valid simpler export is allowed. Unused meshes are structurally checked but not added to active-scene cost.",
+    "This checks mesh structure and relevant binary bounds, not every material, texture, animation or glTF schema rule."
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "blender": "5.2.2 LTS",
+  "geometry_source": "Original procedural mesh geometry",
+  "tile_count": 7,
+  "main_tree_count": 6,
+  "growth_stages": [
+    "seedling",
+    "blossoming",
+    "young",
+    "fruiting",
+    "blossoming",
+    "fruiting"
+  ],
+  "max_main_trees_per_hex": 1,
+  "palette_srgb": {
+    "Brand_Orange": "#FFA01E",
+    "Brand_Navy": "#262A45",
+    "Stage_Cream": "#FFF2D9",
+    "Ground_Grass": "#B4D374",
+    "Ground_Light": "#C5DC88",
+    "Ground_Path": "#EDD1A0",
+    "Leaf_Deep": "#356F35",
+    "Leaf_Mid": "#579A40",
+    "Leaf_Fresh": "#7DB94E",
+    "Leaf_Light": "#A2CE66",
+    "Bark_Warm": "#98603B",
+    "Bark_Light": "#BF8752",
+    "Blossom_Ivory": "#FFF8EC",
+    "Blossom_Blush": "#F8D5D3",
+    "Blossom_Centre": "#F5AF41",
+    "Almond_Hull": "#C5D17E",
+    "Water_Clear": "#72C9DE",
+    "Water_Light": "#B6E5EA",
+    "Stone_Warm": "#B7B7A0",
+    "Stone_Light": "#D8D4BB",
+    "Wood_Honey": "#C48A49",
+    "Flower_Orange": "#FFA01E"
+  },
+  "desktop_frame": {
+    "left": 0.1063183918595314,
+    "right": 0.8936820030212402,
+    "bottom": 0.07627101987600327,
+    "top": 0.9237286448478699
+  },
+  "portrait_frame": {
+    "left": 0.07627137750387192,
+    "right": 0.9237290024757385,
+    "bottom": 0.220139279961586,
+    "top": 0.7798604965209961
+  },
+  "mesh_objects": 38,
+  "base_triangles": 51016,
+  "render_dimensions": [
+    1800,
+    1350
+  ],
+  "preview": false,
+  "limits": [
+    "Visual study, not live garden integration.",
+    "Phone framing is a still-image check, not real-device performance evidence."
+  ]
+}
