@@ -50,6 +50,12 @@ const ADDED_COLUMNS = [
   ["subscribers", "last_viewed_harvests", "INTEGER"],
   ["subscribers", "last_viewed_streak", "INTEGER"],
   ["subscribers", "last_viewed_at", "TEXT"],
+  // Where each harvested tree stands in the reader's hex forest (axial
+  // coords; see public/forest3d/hex-layout.js). NULL until first placed.
+  ["harvests", "hex_q", "INTEGER"],
+  ["harvests", "hex_r", "INTEGER"],
+  // Water tiles the reader has added to their forest: JSON list of [q, r].
+  ["subscribers", "forest_water", "TEXT"],
 ];
 
 function initSchema() {

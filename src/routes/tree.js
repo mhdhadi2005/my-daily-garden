@@ -1,6 +1,7 @@
 const express = require("express");
 const { db } = require("../db");
 const { STAGES, COSMETICS, stageForPoints, POINT_VALUES, streakStatus } = require("../engine/config");
+const { loadForest, moveTree, setWater, readWater } = require("../engine/forest");
 
 
 const router = express.Router();
@@ -31,15 +32,9 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
     ? Math.min(1, (sub.points - currentNeed) / (nextNeed - currentNeed))
     : 1;
 
-  // Forest: completed harvests
+  // Forest: completed harvests, each on its hex
   const totalHarvests = sub.total_harvests || 0;
-  const harvests = db
-    .prepare(`SELECT harvest_number  AS harvestNumber,
-                     points_at_harvest AS pointsAtHarvest,
-                     cosmetic_earned AS cosmeticEarned,
-                     harvested_at    AS harvestedAt
-              FROM harvests WHERE subscriber_id = ? ORDER BY harvest_number ASC`)
-    .all(sub.id);
+  const harvests = loadForest(sub.id);
 
   // Cosmetics inventory
   const cosmeticRows = db
@@ -68,6 +63,7 @@ router.get("/api/tree/:beehiivSubscriberId", (req, res) => {
     totalHarvests,
     canHarvest:       stageIdx >= MAX_STAGE_INDEX,
     forest:           harvests,
+    forestWater:      readWater(sub.id),
     cosmetics:        cosmeticsEnriched,
     pointValues:      POINT_VALUES,
     // What they saw last visit, for the "grown since you were last here"
@@ -97,6 +93,34 @@ router.post("/api/tree/:beehiivSubscriberId/viewed", (req, res) => {
                WHERE id = ?`)
     .run(streakStatus(sub).streak, sub.id);
   res.status(204).end();
+});
+
+// POST /api/tree/:beehiivSubscriberId/forest/move  { harvestNumber, q, r }
+// Moves one harvested tree to another hex in the reader's forest (a tree
+// already there swaps places). Rules: public/forest3d/hex-layout.js.
+router.post("/api/tree/:beehiivSubscriberId/forest/move", (req, res) => {
+  const sub = db
+    .prepare("SELECT id FROM subscribers WHERE beehiiv_subscriber_id = ?")
+    .get(req.params.beehiivSubscriberId);
+  if (!sub) return res.status(404).json({ error: "subscriber not found" });
+  const { harvestNumber, q, r } = req.body || {};
+  const result = moveTree(sub.id, Number(harvestNumber), Number(q), Number(r));
+  if (!result.ok) return res.status(400).json({ error: "invalid_move", message: result.reason });
+  res.json({ forest: result.forest });
+});
+
+// POST /api/tree/:beehiivSubscriberId/forest/water  { q, r, add: true|false }
+// Turns an empty spot into water, or a water tile back into an empty spot.
+// The page joins water tiles into a river itself. Rules: hex-layout.js.
+router.post("/api/tree/:beehiivSubscriberId/forest/water", (req, res) => {
+  const sub = db
+    .prepare("SELECT id FROM subscribers WHERE beehiiv_subscriber_id = ?")
+    .get(req.params.beehiivSubscriberId);
+  if (!sub) return res.status(404).json({ error: "subscriber not found" });
+  const { q, r, add } = req.body || {};
+  const result = setWater(sub.id, Number(q), Number(r), add !== false);
+  if (!result.ok) return res.status(400).json({ error: "invalid_water", message: result.reason });
+  res.json({ water: result.water });
 });
 
 

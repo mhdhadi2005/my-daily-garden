@@ -798,12 +798,13 @@
 
   function sceneHeightFor(stageIndex) {
     const L = currentTreeLayout;
-    return Math.max(200, Math.max(L.forestTop, 8 + currentTreeSize(stageIndex).height) + 30);
+    return Math.max(200, Math.max(L.forestTop, (L.treeBottom ?? 8) + currentTreeSize(stageIndex).height) + 30);
   }
 
   function sizeCurrentTree(stageIndex) {
     const L = currentTreeLayout;
     if (!L) return null;
+    L.lastStage = stageIndex;
     const { width, height } = currentTreeSize(stageIndex);
     const centerPx = Math.max(width / 2 + 4, Math.min(L.containerWidth - width / 2 - 4, L.baseCenterPx));
     const xPercent = (centerPx / L.containerWidth) * 100;
@@ -811,6 +812,7 @@
     $treeContainer.style.left = `${xPercent.toFixed(2)}%`;
     $treeContainer.style.width = `${width.toFixed(0)}px`;
     $treeContainer.style.height = `${height.toFixed(0)}px`;
+    $treeContainer.style.bottom = L.treeBottom != null ? `${L.treeBottom.toFixed(0)}px` : "";
     fitTreeToBox($treeContainer, stageIndex);
     L.scene.style.height = `${sceneHeightFor(stageIndex)}px`;
     return { xPercent, width, height };
@@ -840,6 +842,10 @@
     const forest        = data.forest    || [];
 
     if (!$gardenBackdrop) return;
+    if (FOREST_3D && !forest3dFailed) {
+      renderForest3D(data);
+      return;
+    }
 
     $gardenBackdrop.innerHTML = "";
     if ($gardenCritters) {
@@ -1026,6 +1032,268 @@
         fitTreeToBox(container, FOREST_TREE_STAGE, FOREST_TREE_BOUNDS);
       });
     }
+  }
+
+  // ── 3D forest ──
+  // Harvested trees stand on hex tiles, modelled in Blender (see
+  // forest3d/forest3d.js). The tree you're growing stays this 2D drawing,
+  // stood on the centre hex, so smooth growth, the growth replay and the
+  // streak lights are unchanged. Falls back to the 2D forest if WebGL or the
+  // model isn't available.
+  // The 3D forest is the default; ?forest=2d shows the 2D one. Phones that
+  // can't draw 3D fall back to 2D by themselves (forest3dFailed).
+  const FOREST_3D = new URLSearchParams(window.location.search).get("forest") !== "2d";
+  let forest3dFailed = false;
+  let forest3dModule = null;
+  let forest3dStage = null; // one canvas for the page's life — a new WebGL context per render would leak
+  function loadForest3D() {
+    forest3dModule ??= import("./forest3d/forest3d.js")
+      .then(() => (window.Forest3D && window.Forest3D.supported() ? window.Forest3D : null))
+      .catch((err) => { console.error("3D forest failed to load:", err); return null; });
+    return forest3dModule;
+  }
+
+  function renderForest3D(data) {
+    const totalHarvests = data.totalHarvests || 0;
+
+    $gardenBackdrop.innerHTML = "";
+    if ($gardenCritters) {
+      $gardenCritters.innerHTML = "";
+      $gardenCritters.style.display = "none";
+    }
+    $gardenBackdrop.style.display = "";
+
+    if (totalHarvests > 0) {
+      const head = document.createElement("div");
+      head.className = "grove-head";
+      head.innerHTML =
+        `<span class="grove-title">Your Forest</span>` +
+        `<span class="grove-count">${totalHarvests} tree${totalHarvests === 1 ? "" : "s"} grown</span>`;
+      $gardenBackdrop.appendChild(head);
+    }
+
+    const scene = document.createElement("div");
+    scene.className = "grove-scene is-3d";
+    $gardenBackdrop.appendChild(scene);
+
+    const containerWidth = $gardenBackdrop.clientWidth || 380;
+    const canvasHeight = Math.round(Math.min(420, Math.max(240, containerWidth * 0.72)));
+    forest3dStage ??= document.createElement("div");
+    forest3dStage.className = "grove-3d";
+    forest3dStage.style.height = `${canvasHeight}px`;
+    scene.appendChild(forest3dStage);
+
+    // Until the model reports where the centre hex is, stand the tree
+    // roughly there so nothing jumps far once it loads.
+    currentTreeLayout = {
+      scene,
+      frontWidth: Math.min(115, containerWidth * 0.3),
+      containerWidth,
+      baseCenterPx: containerWidth / 2,
+      forestTop: canvasHeight,
+      treeBottom: canvasHeight * 0.38,
+    };
+    $treeContainer.classList.add("grove-tree-current");
+    scene.appendChild($treeContainer);
+    sizeCurrentTree(data.stage.index);
+
+    // Arrange controls sit under the forest; built here, filled by drawForest3D.
+    const controls = document.createElement("div");
+    controls.className = "forest-arrange";
+    $gardenBackdrop.appendChild(controls);
+
+    Object.assign(forest3d, { data, layout: currentTreeLayout, canvasHeight, scene, controls, selected: null });
+    drawForest3D().catch((err) => {
+      console.error("3D forest unavailable, showing the 2D forest:", err);
+      forest3dFailed = true;
+      if (currentTreeLayout === forest3d.layout) renderForest(data);
+    });
+  }
+
+  // Every harvested tree owns a hex the reader can move (hex-layout.js has
+  // the rules; the server saves each move). Arranging: tap a tree to pick it
+  // up, then tap a light spot — or another tree to swap the two.
+  // In "water" mode a tap on a light spot adds water there and a tap on water
+  // takes it away; the water tiles join into a river by themselves.
+  const forest3d = { data: null, layout: null, canvasHeight: 0, scene: null, controls: null, arranging: false, mode: "trees", selected: null, busy: false, hint: "" };
+  const demoCells = new Map(); // demo page only: moves kept in memory, harvestNumber → { q, r }
+  let demoWater = [];          // demo page only: water tiles kept in memory
+
+  const forestWater = (data) => (isRealMode ? data.forestWater || [] : demoWater);
+
+  function forestTrees(data) {
+    let trees = (data.forest || []).map((h, i) => {
+      const num = h.harvestNumber || i + 1;
+      const cell = isRealMode ? h.hex : demoCells.get(num);
+      return { harvestNumber: num, num, look: treeLook(num), label: `Tree #${num}, harvested at ${h.pointsAtHarvest || 0} pts`, q: cell ? cell.q : null, r: cell ? cell.r : null };
+    });
+    // Demo trees nobody has moved yet take the default spots around the moved ones.
+    if (!isRealMode) trees = window.HexLayout.assignDefaults(trees, demoWater).trees;
+    return trees;
+  }
+
+  // Empty meadow plots showing where the next trees will go, so a new
+  // forest reads as a garden waiting to fill rather than a lone tile.
+  function nextPlots(trees, count, water) {
+    if (count <= 0) return [];
+    const placeholders = Array.from({ length: count }, (_, i) => ({ harvestNumber: 1e9 + i }));
+    return window.HexLayout.assignDefaults([...trees, ...placeholders], water).trees
+      .filter((t) => t.harvestNumber >= 1e9 && Number.isInteger(t.q))
+      .map((t) => [t.q, t.r]);
+  }
+
+  function drawForest3D() {
+    const s = forest3d;
+    const trees = forestTrees(s.data);
+    const water = forestWater(s.data);
+    const waterMode = s.arranging && s.mode === "water";
+    const targets = waterMode ? window.HexLayout.waterTargets(trees, water)
+      : s.arranging && s.selected != null ? window.HexLayout.emptyTargets(trees, s.selected, water) : [];
+    renderArrangeControls(trees.length);
+    const layout = s.layout;
+    return loadForest3D().then((F) => {
+      if (!F) throw new Error("WebGL not available");
+      return F.render(forest3dStage, {
+        trees,
+        plots: nextPlots(trees, 4 - trees.length, water),
+        water,
+        arranging: s.arranging,
+        selected: s.selected,
+        targets,
+        targetStyle: waterMode ? "water" : "tree",
+        onPick: pickInForest,
+        onAnchor: ({ x, y, hexWidth }) => {
+          if (currentTreeLayout !== layout) return; // a newer render owns the scene now
+          layout.baseCenterPx = x;
+          layout.treeBottom = s.canvasHeight - y;
+          layout.frontWidth = Math.max(64, Math.min(110, hexWidth * 0.8));
+          sizeCurrentTree(layout.lastStage ?? s.data.stage.index);
+        },
+      });
+    });
+  }
+
+  function renderArrangeControls(treeCount) {
+    const s = forest3d;
+    if (!s.controls) return;
+    s.scene.classList.toggle("is-arranging", s.arranging);
+    if (!treeCount) { s.controls.innerHTML = ""; return; }
+    if (!s.arranging) {
+      s.controls.innerHTML = `<button type="button" class="forest-arrange-btn">Arrange your forest</button>`;
+      s.controls.querySelector("button").onclick = () => { s.arranging = true; s.mode = "trees"; s.selected = null; s.hint = ""; drawForest3D(); };
+      return;
+    }
+    const hint = s.hint || (s.mode === "water"
+      ? "Tap a blue spot to add water, or tap water to take it away. It joins into a river by itself."
+      : s.selected == null
+        ? "Tap a tree to pick it up."
+        : "Now tap a light spot to move it there, or another tree to swap them.");
+    const tab = (mode, label) =>
+      `<button type="button" class="forest-mode-btn${s.mode === mode ? " is-on" : ""}" data-mode="${mode}" aria-pressed="${s.mode === mode}">${label}</button>`;
+    s.controls.innerHTML =
+      `<div class="forest-mode" role="group" aria-label="What to arrange">${tab("trees", "Move trees")}${tab("water", "Add water")}</div>` +
+      `<p class="forest-arrange-hint" role="status">${hint}</p>` +
+      `<button type="button" class="forest-arrange-btn is-done">Done</button>`;
+    s.controls.querySelectorAll(".forest-mode-btn").forEach((b) => {
+      b.onclick = () => { s.mode = b.dataset.mode; s.selected = null; s.hint = ""; drawForest3D(); };
+    });
+    s.controls.querySelector(".is-done").onclick = () => { s.arranging = false; s.selected = null; s.hint = ""; drawForest3D(); };
+  }
+
+  function pickInForest(pick) {
+    const s = forest3d;
+    if (s.busy) return;
+    s.hint = "";
+    if (s.mode === "water") {
+      if (pick.kind === "cell") return changeWater(pick.q, pick.r, true);
+      if (pick.kind === "water") return changeWater(pick.q, pick.r, false);
+      if (pick.kind === "tree") s.hint = "To move trees, switch to Move trees.";
+      return drawForest3D();
+    }
+    if (pick.kind === "water" && s.selected == null) {
+      s.hint = "That's water. Switch to Add water to change it.";
+      return drawForest3D();
+    }
+    if (pick.kind === "water") return moveSelectedTree(pick.q, pick.r); // explains why it can't go there
+    if (pick.kind === "tree") {
+      if (s.selected == null || pick.harvestNumber === s.selected) {
+        s.selected = s.selected == null ? pick.harvestNumber : null;
+        return drawForest3D();
+      }
+      const other = forestTrees(s.data).find((t) => t.harvestNumber === pick.harvestNumber);
+      return moveSelectedTree(other.q, other.r);
+    }
+    if (pick.kind === "cell" && s.selected != null) return moveSelectedTree(pick.q, pick.r);
+    s.selected = null;
+    drawForest3D();
+  }
+
+  async function moveSelectedTree(q, r) {
+    const s = forest3d;
+    const result = window.HexLayout.applyMove(forestTrees(s.data), s.selected, q, r, forestWater(s.data));
+    if (!result.ok) {
+      s.hint = `Can't go there: ${result.reason}.`;
+      return drawForest3D();
+    }
+    if (isRealMode) {
+      s.busy = true;
+      try {
+        const res = await fetch(`${REAL_API}${encodeURIComponent(realSubscriberId)}/forest/move`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ harvestNumber: s.selected, q, r }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
+        s.data.forest = body.forest;
+      } catch (err) {
+        console.error("Couldn't save the forest move:", err);
+        s.hint = "Couldn't save that move. Please try again.";
+        s.busy = false;
+        return drawForest3D();
+      }
+      s.busy = false;
+    } else {
+      for (const t of result.trees) demoCells.set(t.harvestNumber, { q: t.q, r: t.r });
+    }
+    s.selected = null;
+    s.hint = result.swapWith ? "Swapped! Tap another tree to keep arranging." : "Moved! Tap another tree to keep arranging.";
+    drawForest3D();
+  }
+
+  // Add water to an empty spot (add) or turn a water tile back into an empty spot.
+  async function changeWater(q, r, add) {
+    const s = forest3d;
+    const trees = forestTrees(s.data), water = forestWater(s.data);
+    const check = add ? window.HexLayout.checkAddWater(trees, water, q, r) : window.HexLayout.checkRemoveWater(trees, water, q, r);
+    if (!check.ok) {
+      s.hint = `Can't do that: ${check.reason}.`;
+      return drawForest3D();
+    }
+    const next = add ? [...water, [q, r]] : water.filter(([wq, wr]) => !(wq === q && wr === r));
+    if (isRealMode) {
+      s.busy = true;
+      try {
+        const res = await fetch(`${REAL_API}${encodeURIComponent(realSubscriberId)}/forest/water`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ q, r, add }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
+        s.data.forestWater = body.water;
+      } catch (err) {
+        console.error("Couldn't save the water change:", err);
+        s.hint = "Couldn't save that. Please try again.";
+        s.busy = false;
+        return drawForest3D();
+      }
+      s.busy = false;
+    } else {
+      demoWater = next;
+    }
+    s.hint = add ? "Added! Keep tapping to grow your river." : "Taken away.";
+    drawForest3D();
   }
 
   function getCosmeticCategory(type) {

@@ -5,3 +5,12 @@ data/*.db-wal
 .env
 *.log
 test-fields.js
+.claude/settings.local.json
+# Blender work files, renders and retired models: rebuilt by the scripts in experiments/
+experiments/**/*.blend
+experiments/**/*.blend1
+experiments/**/*.png
+experiments/**/*.jpg
+experiments/**/*.gif
+experiments/**/__pycache__/
+experiments/old-forest-models/
