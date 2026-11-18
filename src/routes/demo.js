@@ -1,5 +1,6 @@
 const express = require("express");
 const { STAGES, COSMETICS, POINT_VALUES } = require("../engine/config");
+const { demoForest } = require("../engine/forest");
 
 
 const router = express.Router();
@@ -52,12 +53,12 @@ router.get("/api/demo/tree", (req, res) => {
     : 1;
 
   // Generate synthetic forest for demo (one entry per harvest)
-  const forest = Array.from({ length: totalHarvests }, (_, i) => ({
+  const forest = demoForest(Array.from({ length: totalHarvests }, (_, i) => ({
     harvestNumber:    i + 1,
     pointsAtHarvest:  1960,
     cosmeticEarned:   DEMO_COSMETICS[i % DEMO_COSMETICS.length].type,
     harvestedAt:      new Date(Date.now() - (totalHarvests - i) * 60 * 24 * 60 * 60 * 1000).toISOString(),
-  }));
+  })));
 
   // Give them one cosmetic per harvest (cycling through demo set)
   const cosmetics = Array.from({ length: totalHarvests }, (_, i) =>

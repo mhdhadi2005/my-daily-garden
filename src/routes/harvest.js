@@ -10,6 +10,7 @@ const express = require("express");
 const { db } = require("../db");
 const { STAGES, stageForPoints, rollHarvestCosmetic } = require("../engine/config");
 const { syncSubscriberStats } = require("../integrations/beehiiv");
+const { loadForest } = require("../engine/forest");
 
 const router = express.Router();
 
@@ -57,10 +58,8 @@ router.post("/api/tree/:beehiivSubscriberId/harvest", (req, res) => {
     tree_stage: STAGES[0].name, // "Seed"
   }).catch((err) => console.error("[harvest] beehiiv sync failed:", err));
 
-  // Pull the full forest history to return
-  const harvests = db
-    .prepare("SELECT * FROM harvests WHERE subscriber_id = ? ORDER BY harvest_number ASC")
-    .all(sub.id);
+  // Pull the full forest history to return (the new tree gets its hex here)
+  const forest = loadForest(sub.id);
 
   const cosmetics = db
     .prepare("SELECT cosmetic_type FROM forest_cosmetics WHERE subscriber_id = ?")
@@ -73,12 +72,7 @@ router.post("/api/tree/:beehiivSubscriberId/harvest", (req, res) => {
     newPoints: 0,
     newStage: { index: 0, name: STAGES[0].name },
     totalHarvests: harvestNumber,
-    forest: harvests.map((h) => ({
-      harvestNumber: h.harvest_number,
-      pointsAtHarvest: h.points_at_harvest,
-      cosmeticEarned: h.cosmetic_earned,
-      harvestedAt: h.harvested_at,
-    })),
+    forest,
     cosmetics: cosmetics.map((c) => c.cosmetic_type),
   });
 });

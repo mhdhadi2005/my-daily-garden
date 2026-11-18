@@ -9,6 +9,7 @@ const wpAuthRoutes  = require("./routes/wp-auth");
 const demoRoutes    = require("./routes/demo");
 const jobRoutes     = require("./routes/jobs");
 const { startScheduler } = require("./jobs/scheduler");
+const { compressedStatic } = require("./static-compressed");
 
 initSchema();
 
@@ -20,7 +21,12 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 
-app.use(express.static(path.join(__dirname, "..", "public")));
+const PUBLIC = path.join(__dirname, "..", "public");
+app.use(compressedStatic(PUBLIC, {
+  longCache: (rel) => rel.startsWith("/forest3d/vendor/"), // three.js: only changes on an upgrade
+  warm: ["forest3d/vendor/three.core.js", "forest3d/vendor/three.module.js", "forest3d/tree-reference.glb"],
+}));
+app.use(express.static(PUBLIC));
 app.use(webhookRoutes);
 app.use(treeRoutes);
 app.use(harvestRoutes);

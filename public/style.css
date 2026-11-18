@@ -449,6 +449,100 @@ body {
   border-radius: 100px;
 }
 
+/* ── 3D forest test (?forest=3d): the WebGL canvas sits under the 2D tree you're growing ── */
+.grove-scene.is-3d .grove-3d {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.grove-3d canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* While arranging, taps go to the forest tiles, not the growing tree drawn over them */
+.grove-scene.is-arranging .tree-container,
+.grove-scene.is-arranging .tree-container * {
+  pointer-events: none;
+}
+
+.forest-arrange {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.forest-arrange:empty {
+  display: none;
+}
+
+.forest-arrange-hint {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 100px;
+}
+
+.forest-arrange-btn {
+  min-height: 44px;
+  padding: 10px 22px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: #3E8E5A;
+  border: none;
+  border-radius: 100px;
+  cursor: pointer;
+}
+
+.forest-arrange-btn.is-done {
+  color: var(--text-secondary);
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #3E8E5A;
+}
+
+/* Move trees / Add water switch while arranging */
+.forest-mode {
+  display: inline-flex;
+  padding: 3px;
+  background: #fff;
+  border-radius: 100px;
+  box-shadow: inset 0 0 0 2px #3E8E5A;
+}
+
+.forest-mode-btn {
+  min-height: 40px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 100px;
+  cursor: pointer;
+}
+
+.forest-mode-btn.is-on {
+  color: #fff;
+  background: #3E8E5A;
+}
+
+.forest-mode-btn.is-on[data-mode="water"] {
+  background: #2F86B0;
+}
+
 @keyframes groveIn {
   from { opacity: 0; transform: translateX(-50%) translateY(14px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
