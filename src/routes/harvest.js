@@ -7,12 +7,14 @@
 // - Returns celebration data + cosmetic earned
 
 const express = require("express");
+const { resolvePassParam } = require("../engine/pass");
 const { db } = require("../db");
 const { STAGES, stageForPoints, rollHarvestCosmetic } = require("../engine/config");
 const { syncSubscriberStats } = require("../integrations/beehiiv");
 const { loadForest } = require("../engine/forest");
 
 const router = express.Router();
+router.param("beehiivSubscriberId", resolvePassParam); // a WordPress pass works wherever an ID does
 
 const MAX_STAGE_INDEX = STAGES.length - 1;
 
