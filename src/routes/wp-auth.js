@@ -2,6 +2,8 @@ const express = require("express");
 const crypto = require("crypto");
 const { db } = require("../db");
 const { STAGES, stageForPoints, streakStatus } = require("../engine/config");
+const { recordPurchase } = require("../engine");
+const { createPass } = require("../engine/pass");
 
 const router = express.Router();
 
@@ -69,6 +71,57 @@ router.post("/api/wp/tree-status", (req, res) => {
     stage: stage.name,
     nextStage: nextStage ? { name: nextStage.name, pointsNeeded: nextStage.need - sub.points } : null,
   });
+});
+
+// The garden of a WordPress user: already linked by user ID, or else the
+// subscriber with the same email, which gets linked now. null if this
+// person hasn't started a garden (no newsletter click yet).
+function findGarden(wpUserId, email) {
+  const id = Number(wpUserId) || 0;
+  if (id) {
+    const linked = db.prepare("SELECT * FROM subscribers WHERE wp_user_id = ?").get(id);
+    if (linked) return linked;
+  }
+  const mail = String(email || "").trim().toLowerCase();
+  if (!mail) return null;
+  const byEmail = db.prepare("SELECT * FROM subscribers WHERE lower(email) = ? ORDER BY id LIMIT 1").get(mail);
+  if (byEmail && id && !byEmail.wp_user_id) {
+    db.prepare("UPDATE subscribers SET wp_user_id = ? WHERE id = ?").run(id, byEmail.id);
+    return { ...byEmail, wp_user_id: id };
+  }
+  return byEmail || null;
+}
+
+// POST /api/wp/ping — the plugin's settings page checks the address and secret.
+router.post("/api/wp/ping", (req, res) => {
+  if (!verifyWpSignature(req)) return res.status(401).json({ error: "invalid or missing signature" });
+  res.json({ ok: true });
+});
+
+// POST /api/wp/session  { wp_user_id, email }
+// The plugin asks for a pass to show this logged-in reader their garden.
+router.post("/api/wp/session", (req, res) => {
+  if (!verifyWpSignature(req)) return res.status(401).json({ error: "invalid or missing signature" });
+  const { wp_user_id, email } = req.body || {};
+  if (!wp_user_id && !email) return res.status(400).json({ error: "missing wp_user_id or email" });
+  const sub = findGarden(wp_user_id, email);
+  if (!sub) return res.json({ linked: false });
+  res.json({ linked: true, ...createPass(sub.beehiiv_subscriber_id) });
+});
+
+// POST /api/wp/purchase  { wp_user_id, email, order_id, total, currency }
+// A WooCommerce order was completed. Points go to the buyer's garden, once
+// per order however often WordPress reports it.
+router.post("/api/wp/purchase", (req, res) => {
+  if (!verifyWpSignature(req)) return res.status(401).json({ error: "invalid or missing signature" });
+  const { wp_user_id, email, order_id, total } = req.body || {};
+  if (!order_id) return res.status(400).json({ error: "missing order_id" });
+  const sub = findGarden(wp_user_id, email);
+  if (!sub) return res.json({ credited: false, reason: "no garden for this customer yet" });
+  const seen = db.prepare("SELECT 1 FROM purchase_log WHERE subscriber_id = ? AND order_id = ?").get(sub.id, String(order_id));
+  if (seen) return res.json({ credited: false, reason: "already credited" });
+  const result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  res.json({ credited: true, pointsAwarded: result.pointsAwarded, points: result.subscriber.points });
 });
 
 module.exports = router;

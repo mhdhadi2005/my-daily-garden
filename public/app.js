@@ -103,7 +103,9 @@
   // ── Initialization ──
   function init() {
     const params = new URLSearchParams(window.location.search);
-    realSubscriberId = params.get("subscriber");
+    // ?subscriber=<id> from newsletter links, or ?pass=<signed pass> when the
+    // WordPress plugin shows the garden on a reader's account page.
+    realSubscriberId = params.get("subscriber") || params.get("pass");
     isRealMode = !!realSubscriberId;
 
     if (isRealMode) {

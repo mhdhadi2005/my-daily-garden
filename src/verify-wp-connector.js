@@ -1,11 +1,11 @@
-// Simulates exactly what the WordPress connector snippet sends to
+// Simulates exactly what the WordPress plugin sends to
 // /api/wp/tree-status, so the signature handshake can be proven end to end
 // without touching the WordPress site.
 //
 //   node src/verify-wp-connector.js <wp_user_id> [app_url]
 //
-// Reads WP_APP_SHARED_SECRET from .env — it must match MDG_SHARED_SECRET in
-// wordpress-snippet/my-daily-garden-connector.php.
+// Reads WP_APP_SHARED_SECRET from .env — it must match the secret saved in
+// the plugin's settings (Settings → My Daily Garden).
 
 require("dotenv").config();
 const crypto = require("crypto");
@@ -15,7 +15,7 @@ const appUrl = (process.argv[3] || process.env.APP_URL || "http://localhost:3001
 const secret = process.env.WP_APP_SHARED_SECRET;
 
 if (!secret) {
-  console.error("WP_APP_SHARED_SECRET is not set in .env — set it to the same value as MDG_SHARED_SECRET in the PHP snippet.");
+  console.error("WP_APP_SHARED_SECRET is not set in .env — set it to the same value as the plugin's shared secret.");
   process.exit(1);
 }
 
@@ -43,7 +43,7 @@ const signature = crypto.createHmac("sha256", secret).update(`${timestamp}:${bod
 
   if (res.status === 401) {
     console.log("✗ Signature rejected. Check that WP_APP_SHARED_SECRET here matches");
-    console.log("  MDG_SHARED_SECRET in the PHP snippet, and that both machines' clocks");
+    console.log("  the plugin's shared secret, and that both machines' clocks");
     console.log("  are within 60s of each other.");
     process.exit(1);
   }

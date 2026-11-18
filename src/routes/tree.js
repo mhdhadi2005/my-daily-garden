@@ -1,10 +1,12 @@
 const express = require("express");
+const { resolvePassParam } = require("../engine/pass");
 const { db } = require("../db");
 const { STAGES, COSMETICS, stageForPoints, POINT_VALUES, streakStatus } = require("../engine/config");
 const { loadForest, moveTree, setWater, readWater } = require("../engine/forest");
 
 
 const router = express.Router();
+router.param("beehiivSubscriberId", resolvePassParam); // a WordPress pass works wherever an ID does
 
 const MAX_STAGE_INDEX = STAGES.length - 1;
 

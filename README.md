@@ -18,16 +18,20 @@ sync-back, and the WordPress auth flow — wired up and tested end to end.
   link attempt + beehiiv sync-back after every scored click.
 - **Webhook routes** (`src/routes/webhooks.js`) — the two endpoints beehiiv's
   automations call: one for Click Triggers, one for Email Opened.
-- **WordPress auth route** (`src/routes/wp-auth.js`) — the server-to-server
-  endpoint WordPress calls (see `wordpress-snippet/`) after verifying who's
-  logged in on its own side. Verifies a signed, timestamped request so it
-  can't be forged or replayed.
-- **WordPress connector snippet** (`wordpress-snippet/my-daily-garden-connector.php`) —
-  the one piece of code that lives on the WordPress site itself, meant to be
-  pasted into WPCode. Registers a REST route WordPress-side, checks
-  `is_user_logged_in()`, and calls the app's `/api/wp/tree-status` on her
-  behalf. Includes a `[my_daily_garden_tree]` shortcode to drop onto the My
-  Account page.
+- **WordPress routes** (`src/routes/wp-auth.js`) — what the WordPress plugin
+  calls, server to server, after WordPress has checked who's logged in:
+  `/api/wp/session` (a short-lived signed pass to that reader's garden,
+  matching them by email the first time), `/api/wp/purchase` (points for a
+  completed WooCommerce order, once per order), `/api/wp/ping` (the plugin's
+  connection check) and `/api/wp/tree-status`. Every request is signed and
+  timestamped with `WP_APP_SHARED_SECRET`, so it can't be forged or replayed.
+  Passes (`src/engine/pass.js`) work wherever a subscriber ID does.
+- **WordPress plugin** (`wordpress-plugin/my-daily-garden/`) — the only code
+  on the WordPress site. Adds a "My Garden" tab to the WooCommerce account
+  page and a `[my_daily_garden]` shortcode that show the reader's garden in a
+  frame, a settings page for the shared secret, and purchase points. Zip the
+  folder (or use `wordpress-plugin/my-daily-garden.zip`) and upload it under
+  Plugins → Add New.
 - **WooCommerce client** (`src/integrations/woocommerce.js`) — looks up a
   customer by email via WooCommerce's own REST API, links `wp_user_id` once
   found. Safe to call repeatedly; no-ops if already linked or no account
@@ -68,8 +72,8 @@ npm start     # starts the real server on :3001
 2. **WooCommerce REST API keys** — WooCommerce → Settings → Advanced →
    REST API. Takes about a minute.
 3. **A shared secret for the WordPress connector** — any long random string,
-   set as both `WP_APP_SHARED_SECRET` here and `MDG_SHARED_SECRET` in the
-   PHP snippet. Treat it like a password.
+   set as `WP_APP_SHARED_SECRET` here and pasted into the plugin's settings
+   page (Settings → My Daily Garden). Treat it like a password.
 4. **Hosting** — this only runs locally right now. Needs a deploy target
    (Railway/Render both work well for an app like this) before beehiiv or
    WordPress can actually reach it.
