@@ -77,11 +77,29 @@ function moveTree(subscriberId, harvestNumber, q, r) {
 function setWater(subscriberId, q, r, add) {
   const water = readWater(subscriberId);
   const { trees } = HexLayout.assignDefaults(readHarvests(subscriberId), water);
-  const check = add ? HexLayout.checkAddWater(trees, water, q, r) : HexLayout.checkRemoveWater(trees, water, q, r);
-  if (!check.ok) return { ok: false, reason: check.reason };
-  const next = add ? [...water, [q, r]] : water.filter(([wq, wr]) => !(wq === q && wr === r));
-  saveWater(subscriberId, next);
-  return { ok: true, water: next };
+  let next, dried = 0;
+  if (add) {
+    const check = HexLayout.checkAddWater(trees, water, q, r);
+    if (!check.ok) return { ok: false, reason: check.reason };
+    next = [...water, [q, r]];
+  } else {
+    const result = HexLayout.removeWater(trees, water, q, r);
+    if (!result.ok) return { ok: false, reason: result.reason };
+    next = result.water;
+    dried = result.dried;
+  }
+  // A tree the water was holding on to moves back next to the forest.
+  const placed = HexLayout.assignDefaults(trees, next);
+  db.exec("BEGIN");
+  try {
+    saveWater(subscriberId, next);
+    if (placed.changed.length) saveCells(subscriberId, placed.changed);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+  return { ok: true, water: next, dried, forest: toResponse(placed.trees) };
 }
 
 // Demo forests aren't stored; they get the same default layout.

@@ -162,6 +162,34 @@ const WATER_TARGET_MATERIAL = new THREE.MeshBasicMaterial({ color: "#DDF2FA", tr
 const WATER_TARGET_RIM = new THREE.LineBasicMaterial({ color: "#2F86B0", toneMapped: false });
 const SELECTED_MATERIAL = new THREE.MeshBasicMaterial({ color: "#F2A23A", transparent: true, opacity: 0.75, depthWrite: false });
 
+// Arranging: a gold outline round the top of each tile you can pick up, and
+// round the one you've picked up, which also lifts, glows and bobs.
+const OUTLINE_GEOMETRY = new THREE.RingGeometry(1.2, 1.42, 6, 1);
+OUTLINE_GEOMETRY.rotateX(-Math.PI / 2); // flat on the tile; the ring's corners fall on the hex's corners
+const TAPPABLE_OUTLINE = new THREE.MeshBasicMaterial({ color: "#FFD45C", transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false });
+const PICKED_OUTLINE = new THREE.MeshBasicMaterial({ color: "#FFB020", transparent: true, opacity: 1, depthWrite: false, toneMapped: false });
+const LIFT_HEIGHT = 0.85, LIFT_MS = 380;
+const glowMaterials = new Map(); // material → its glowing copy, for the picked-up tile
+function outline(material) {
+  const ring = new THREE.Mesh(OUTLINE_GEOMETRY, material);
+  ring.position.y = 0.2 + 0.012;
+  ring.renderOrder = 2;
+  ring.userData.noShadow = true;
+  return ring;
+}
+function glow(tile) {
+  tile.traverse((o) => {
+    if (!o.isMesh || o.userData.noShadow) return;
+    const swap = (m) => {
+      if (!m || !("emissive" in m)) return m;
+      if (!glowMaterials.has(m)) { const g = m.clone(); g.emissive = new THREE.Color("#FFB547"); g.emissiveIntensity = 0.3; glowMaterials.set(m, g); }
+      return glowMaterials.get(m);
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+  });
+}
+const easeOutBack = (x) => 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
+
 // ── River pieces ──
 // Every water tile works out its own piece from which of its six edges have
 // water next door (HexLayout.waterShape). Each channel leaves an edge at that
@@ -458,6 +486,17 @@ function flock(k, world) {
 // Everything that moves, posed for time t (ms).
 function animate(view, t) {
   const s = t / 1000;
+  if (view.arranging) {
+    const pulse = 0.5 + 0.5 * Math.sin(s * 4.2);
+    TAPPABLE_OUTLINE.opacity = 0.35 + 0.6 * pulse;
+    TARGET_MATERIAL.opacity = WATER_TARGET_MATERIAL.opacity = 0.55 + 0.4 * pulse;
+    for (const g of glowMaterials.values()) g.emissiveIntensity = 0.22 + 0.22 * pulse;
+    if (view.lifted) {
+      const p = Math.min(1, Math.max(0, (t - view.liftStart) / LIFT_MS));
+      const bob = p >= 1 && !reduceMotion ? 0.05 * Math.sin(s * 2.6) : 0;
+      view.lifted.obj.position.y = view.lifted.base + LIFT_HEIGHT * easeOutBack(p) + bob;
+    }
+  }
   for (const w of view.sway) w.obj.rotation.z = Math.sin(s * w.speed + w.phase) * 0.03;
   if (riverMats) {
     riverMats.flow.offset.y = (s * FLOW_SPEED / FLOW_PERIOD) % 1;   // the river runs
@@ -596,6 +635,8 @@ async function render(container, { trees = [], plots = [], water = [], arranging
   if (view.world) view.scene.remove(view.world);
   const world = new THREE.Group();
   view.sway = [];
+  view.lifted = null;
+  if (!arranging || selected == null) view.liftKey = null;
   const place = (piece, q, r) => { piece.position.copy(hexToWorld(q, r)); world.add(piece); return piece; };
   place(k.tile(0, 0), 0, 0); // a plain meadow tile: a bench or path would crowd the growing tree
   const pond = place(k.pond(), ...POND_HEX);
@@ -615,10 +656,17 @@ async function render(container, { trees = [], plots = [], water = [], arranging
     const tile = place(k.tile(t.q, t.r, { life: true }), t.q, t.r);
     tile.userData.pick = { kind: "tree", harvestNumber: t.harvestNumber };
     if (arranging && t.harvestNumber === selected) {
-      tile.position.y += 0.45; // lifted: this is the one you're moving
+      // The one you're moving: it lifts (animate() eases it up and bobs it),
+      // glows, and an orange mark shows the spot it came from.
+      if (view.liftKey !== t.harvestNumber) { view.liftKey = t.harvestNumber; view.liftStart = reduceMotion ? -Infinity : performance.now(); }
+      view.lifted = { obj: tile, base: tile.position.y };
+      glow(tile);
+      tile.add(outline(PICKED_OUTLINE));
       const mark = new THREE.Mesh(TARGET_GEOMETRY, SELECTED_MATERIAL);
       mark.position.copy(hexToWorld(t.q, t.r)).setY(0.06);
       world.add(mark);
+    } else if (arranging && selected == null && targetStyle !== "water") {
+      tile.add(outline(TAPPABLE_OUTLINE)); // you can pick this one up
     }
     const tree = k.tree(t);
     tree.rotation.y = ((t.num * 53) % 360) * (Math.PI / 180); // each tree faces its own way
@@ -680,6 +728,7 @@ function fit(container, view) {
   // Mirror the bounds across x = 0 so the growing tree's hex is always in the
   // middle, however lopsided the outer ring is so far.
   const bounds = new THREE.Box3().setFromObject(view.world);
+  if (view.arranging) bounds.max.y += LIFT_HEIGHT + 0.1; // room for a picked-up tile
   const halfX = Math.max(-bounds.min.x, bounds.max.x);
   bounds.min.x = -halfX;
   bounds.max.x = halfX;

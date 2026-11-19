@@ -1185,20 +1185,26 @@
       s.controls.querySelector("button").onclick = () => { s.arranging = true; s.mode = "trees"; s.selected = null; s.hint = ""; drawForest3D(); };
       return;
     }
-    const hint = s.hint || (s.mode === "water"
-      ? "Tap a blue spot to add water, or tap water to take it away. It joins into a river by itself."
-      : s.selected == null
-        ? "Tap a tree to pick it up."
-        : "Now tap a light spot to move it there, or another tree to swap them.");
+    // Two numbered steps, so it's obvious what to tap and in what order.
+    const step = (n, text, state) =>
+      `<li class="forest-step is-${state}"><span class="forest-step-num" aria-hidden="true">${state === "done" ? "✓" : n}</span><span>${text}</span></li>`;
+    const steps = s.mode === "water"
+      ? step(1, "Tap a <strong>blue spot</strong> to add water", "now") + step(2, "Tap <strong>water</strong> to take it away", "now")
+      : step(1, "Tap a <strong>tree</strong> to pick it up", s.selected == null ? "now" : "done") +
+        step(2, "Tap a <strong>glowing spot</strong> to move it there", s.selected == null ? "next" : "now");
     const tab = (mode, label) =>
       `<button type="button" class="forest-mode-btn${s.mode === mode ? " is-on" : ""}" data-mode="${mode}" aria-pressed="${s.mode === mode}">${label}</button>`;
     s.controls.innerHTML =
       `<div class="forest-mode" role="group" aria-label="What to arrange">${tab("trees", "Move trees")}${tab("water", "Add water")}</div>` +
-      `<p class="forest-arrange-hint" role="status">${hint}</p>` +
+      `<ol class="forest-steps" aria-label="How to arrange">${steps}</ol>` +
+      (s.hint ? `<p class="forest-arrange-hint" role="status">${s.hint}</p>` : "") +
+      (s.mode === "trees" && s.selected != null ? `<button type="button" class="forest-arrange-btn is-putback">Put it back</button>` : "") +
       `<button type="button" class="forest-arrange-btn is-done">Done</button>`;
     s.controls.querySelectorAll(".forest-mode-btn").forEach((b) => {
       b.onclick = () => { s.mode = b.dataset.mode; s.selected = null; s.hint = ""; drawForest3D(); };
     });
+    const putBack = s.controls.querySelector(".is-putback");
+    if (putBack) putBack.onclick = () => { s.selected = null; s.hint = ""; drawForest3D(); };
     s.controls.querySelector(".is-done").onclick = () => { s.arranging = false; s.selected = null; s.hint = ""; drawForest3D(); };
   }
 
@@ -1220,6 +1226,7 @@
     if (pick.kind === "tree") {
       if (s.selected == null || pick.harvestNumber === s.selected) {
         s.selected = s.selected == null ? pick.harvestNumber : null;
+        if (s.selected != null) s.hint = "Picked up! Now tap a glowing spot, or another tree to swap them.";
         return drawForest3D();
       }
       const other = forestTrees(s.data).find((t) => t.harvestNumber === pick.harvestNumber);
@@ -1267,12 +1274,13 @@
   async function changeWater(q, r, add) {
     const s = forest3d;
     const trees = forestTrees(s.data), water = forestWater(s.data);
-    const check = add ? window.HexLayout.checkAddWater(trees, water, q, r) : window.HexLayout.checkRemoveWater(trees, water, q, r);
+    const check = add ? window.HexLayout.checkAddWater(trees, water, q, r) : window.HexLayout.removeWater(trees, water, q, r);
     if (!check.ok) {
       s.hint = `Can't do that: ${check.reason}.`;
       return drawForest3D();
     }
-    const next = add ? [...water, [q, r]] : water.filter(([wq, wr]) => !(wq === q && wr === r));
+    const next = add ? [...water, [q, r]] : check.water;
+    let dried = add ? 0 : check.dried;
     if (isRealMode) {
       s.busy = true;
       try {
@@ -1284,6 +1292,8 @@
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.message || `HTTP ${res.status}`);
         s.data.forestWater = body.water;
+        if (body.forest) s.data.forest = body.forest; // a tree the water held on to has moved back
+        if (Number.isInteger(body.dried)) dried = body.dried;
       } catch (err) {
         console.error("Couldn't save the water change:", err);
         s.hint = "Couldn't save that. Please try again.";
@@ -1294,7 +1304,8 @@
     } else {
       demoWater = next;
     }
-    s.hint = add ? "Added! Keep tapping to grow your river." : "Taken away.";
+    s.hint = add ? "Added! Keep tapping to grow your river."
+      : dried ? "Taken away, with the water that flowed into it." : "Taken away.";
     drawForest3D();
   }
 

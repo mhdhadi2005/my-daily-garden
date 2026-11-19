@@ -543,6 +543,62 @@ body {
   background: #2F86B0;
 }
 
+/* The numbered steps while arranging: the one to do now stands out */
+.forest-steps {
+  list-style: none;
+  margin: 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(38, 42, 69, 0.12);
+}
+
+.forest-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.forest-step-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #fff;
+  background: #3E8E5A;
+}
+
+.forest-step.is-now .forest-step-num {
+  background: #F29A1E;
+  box-shadow: 0 0 0 4px rgba(242, 154, 30, 0.25);
+}
+
+.forest-step.is-next {
+  color: var(--text-secondary);
+}
+
+.forest-step.is-next .forest-step-num {
+  color: var(--text-secondary);
+  background: #E3E7EC;
+}
+
+.forest-step.is-done {
+  color: var(--text-secondary);
+}
+
+.forest-arrange-btn.is-putback {
+  background: #F29A1E;
+}
+
 @keyframes groveIn {
   from { opacity: 0; transform: translateX(-50%) translateY(14px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
