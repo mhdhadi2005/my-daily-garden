@@ -122,7 +122,7 @@ router.post("/api/tree/:beehiivSubscriberId/forest/water", (req, res) => {
   const { q, r, add } = req.body || {};
   const result = setWater(sub.id, Number(q), Number(r), add !== false);
   if (!result.ok) return res.status(400).json({ error: "invalid_water", message: result.reason });
-  res.json({ water: result.water });
+  res.json({ water: result.water, dried: result.dried, forest: result.forest });
 });
 
 

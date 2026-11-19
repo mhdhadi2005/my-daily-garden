@@ -14,4 +14,3 @@ experiments/**/*.jpg
 experiments/**/*.gif
 experiments/**/__pycache__/
 experiments/old-forest-models/
-wordpress-plugin/*.zip

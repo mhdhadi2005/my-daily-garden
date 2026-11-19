@@ -159,12 +159,22 @@
     return { ok: true };
   }
 
-  // Turn water back into an empty spot, as long as nothing is left cut off.
-  function checkRemoveWater(trees, water, q, r) {
+  // Turn water back into an empty spot. Always allowed, so a reader can take
+  // away every bit of water: water this cuts off from the forest dries up
+  // too, and a tree it cuts off moves back next to the forest (assignDefaults
+  // does that wherever the forest is drawn or saved). Returns the water left
+  // and how many extra tiles dried up.
+  function removeWater(trees, water, q, r) {
     if (!hasWater(water, q, r)) return { ok: false, reason: "that isn't a water tile" };
     const rest = water.filter(([wq, wr]) => !(wq === q && wr === r));
-    if (strandedCount(occupiedMap(trees, null, rest)) > strandedCount(occupiedMap(trees, null, water))) return { ok: false, reason: "that would cut part of your forest off" };
-    return { ok: true };
+    const linked = linkedCells(occupiedMap(trees, null, rest));
+    const kept = rest.filter(([wq, wr]) => linked.has(key(wq, wr)));
+    return { ok: true, water: kept, dried: rest.length - kept.length };
+  }
+
+  function checkRemoveWater(trees, water, q, r) {
+    const result = removeWater(trees, water, q, r);
+    return result.ok ? { ok: true } : result;
   }
 
   function waterTargets(trees, water) {
@@ -209,7 +219,7 @@
 
   const api = {
     CENTRE, POND, MAX_RING, MAX_WATER, DIRS, DEFAULT_ORDER, ring, isReserved, assignDefaults, checkMove, applyMove, emptyTargets,
-    checkAddWater, checkRemoveWater, waterTargets, waterShape,
+    checkAddWater, checkRemoveWater, removeWater, waterTargets, waterShape,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.HexLayout = api;
