@@ -14,9 +14,13 @@ const crypto = require("crypto");
 const PREFIX = "p1.";
 const LIFETIME_SECONDS = 12 * 60 * 60; // long enough for a visit, short enough that a copied link soon stops working
 
-// The same secret the plugin signs its requests with. Without one (local
-// development only) a random secret is used, so passes last until a restart.
-const SECRET = process.env.WP_APP_SHARED_SECRET || crypto.randomBytes(32).toString("hex");
+// Its own secret, so nobody who can see the WordPress settings (where the
+// plugin's shared secret lives) can make passes. Without one, a random key
+// is used: passes then stop working at every restart, so set it in production.
+const configured = process.env.GARDEN_PASS_SECRET || "";
+if (configured && configured.length < 32) throw new Error("GARDEN_PASS_SECRET must be at least 32 characters");
+if (!configured && process.env.NODE_ENV === "production") console.warn("GARDEN_PASS_SECRET is not set: garden passes will stop working at every restart.");
+const SECRET = configured || crypto.randomBytes(32).toString("hex");
 
 const sign = (payload) => crypto.createHmac("sha256", `pass:${SECRET}`).update(payload).digest("base64url");
 

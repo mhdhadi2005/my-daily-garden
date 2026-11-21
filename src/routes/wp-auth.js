@@ -37,12 +37,21 @@ function verifyWpSignature(req) {
   const payload = `${timestamp}:${raw}`;
   const expected = crypto.createHmac("sha256", SHARED_SECRET).update(payload).digest("hex");
 
+  let ok = false;
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    ok = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
     return false; // signature was malformed / wrong length — reject, don't throw
   }
+  if (!ok) return false;
+  // Each signed request works once: a copy replayed inside the time window is refused.
+  const now = Date.now();
+  for (const [sig, at] of seenSignatures) if (now - at > 2 * MAX_REQUEST_AGE_SECONDS * 1000) seenSignatures.delete(sig);
+  if (seenSignatures.has(signature)) return false;
+  seenSignatures.set(signature, now);
+  return true;
 }
+const seenSignatures = new Map(); // signature → when it was first seen
 
 // POST /api/wp/tree-status  { wp_user_id }
 // Called by WordPress on behalf of whichever subscriber is actually logged
@@ -53,7 +62,7 @@ router.post("/api/wp/tree-status", (req, res) => {
   const { wp_user_id } = req.body || {};
   if (!wp_user_id) return res.status(400).json({ error: "missing wp_user_id" });
 
-  const sub = db.prepare("SELECT * FROM subscribers WHERE wp_user_id = ?").get(wp_user_id);
+  const sub = findGarden(wp_user_id);
   if (!sub) {
     // Not an error — she may be logged in and have an account, but hasn't
     // clicked anything from an email yet, so no garden record exists.
@@ -115,9 +124,10 @@ router.post("/api/wp/purchase", (req, res) => {
   if (!(Number(total) > 0)) return res.json({ credited: false, reason: "free order" });
   const wanted = (process.env.PURCHASE_CURRENCY || "").toUpperCase();
   if (wanted && String(currency || "").toUpperCase() !== wanted) return res.json({ credited: false, reason: "other currency" });
-  const seen = db.prepare("SELECT 1 FROM purchase_log WHERE subscriber_id = ? AND order_id = ?").get(sub.id, String(order_id));
+  const seen = db.prepare("SELECT 1 FROM purchase_log WHERE order_id = ?").get(String(order_id));
   if (seen) return res.json({ credited: false, reason: "already credited" });
   const result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  if (result.duplicate) return res.json({ credited: false, reason: "already credited" });
   res.json({ credited: true, pointsAwarded: result.pointsAwarded, points: result.subscriber.points });
 });
 

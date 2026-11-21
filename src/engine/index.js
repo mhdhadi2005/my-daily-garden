@@ -5,7 +5,6 @@ const {
   stageForPoints, pointsForPurchase, STAGES, rollReward, todayStr, daysBetween,
 } = require("./config");
 
-const { linkSubscriberIfPossible } = require("../integrations/woocommerce");
 const { syncSubscriberStats } = require("../integrations/beehiiv");
 
 // Both integrations are best-effort side effects, not part of the critical
@@ -14,13 +13,8 @@ const { syncSubscriberStats } = require("../integrations/beehiiv");
 // cause a webhook to fail or a click to go unrecorded. Fire-and-forget with
 // its own error handling, on purpose.
 function syncInBackground(sub, newStage) {
-  // Linking a newsletter reader to a shop account by email alone trusts an
-  // address nobody has verified, so it only runs when switched on deliberately.
-  if (process.env.WP_LINK_BY_EMAIL === "1") {
-    linkSubscriberIfPossible(db, sub).catch((err) => {
-      console.warn(`WooCommerce link skipped for subscriber ${sub.id}:`, err.message);
-    });
-  }
+  // (Readers are never linked to shop accounts by email: an address nobody
+  // has verified isn't proof of who someone is. Linking is done by hand.)
   const fields = { streak: sub.streak, points: sub.points, tree_stage: STAGES[newStage].name };
   const link = gardenLink(sub);
   if (link) fields.garden_link = link; // newsletters link to the garden with {{garden_link}}
@@ -127,7 +121,11 @@ function recordClick({ beehiivSubscriberId, email, linkUrl, linkId }) {
  */
 function recordOpen({ beehiivSubscriberId, email }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
+  // Only the first open of the day earns points: beehiiv can fire the same
+  // automation more than once, and opens shouldn't be farmable.
+  const openedToday = db.prepare("SELECT 1 FROM open_log WHERE subscriber_id = ? AND date(opened_at) = date('now')").get(sub.id);
   db.prepare("INSERT INTO open_log (subscriber_id) VALUES (?)").run(sub.id);
+  if (openedToday) return { subscriber: sub, pointsAwarded: 0, counted: false };
   const newPoints = sub.points + OPEN_BONUS_POINTS;
   db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
   return { subscriber: { ...sub, points: newPoints }, pointsAwarded: OPEN_BONUS_POINTS };
@@ -141,6 +139,10 @@ function recordOpen({ beehiivSubscriberId, email }) {
  */
 function recordQuizAnswer({ beehiivSubscriberId, email, quizId, correct }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
+  // One answer per quiz counts; repeats (or a second try) earn nothing.
+  if (db.prepare("SELECT 1 FROM quiz_response_log WHERE subscriber_id = ? AND quiz_id = ?").get(sub.id, String(quizId))) {
+    return { subscriber: sub, pointsAwarded: 0, counted: false };
+  }
   db.prepare(
     "INSERT INTO quiz_response_log (subscriber_id, quiz_id, correct) VALUES (?, ?, ?)"
   ).run(sub.id, quizId, correct ? 1 : 0);
@@ -161,7 +163,8 @@ function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
     db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
       .run(sub.id, orderId || null, amount ? Number(amount) : null);
   } catch (err) {
-    console.warn("Could not insert purchase_log:", err.message);
+    // The order is already in the log (the unique index): never credit it twice.
+    return { subscriber: sub, pointsAwarded: 0, stageChanged: false, newStage: stageForPoints(sub.points), duplicate: true };
   }
 
   const pointsAwarded = pointsForPurchase(amount);

@@ -100,10 +100,15 @@ is refused. Passes come from:
 `--unlink` to undo). Emails are never used to pick a garden; conflicting or
 ambiguous links are refused.
 
-**Secrets are required.** Without `WP_APP_SHARED_SECRET`,
-`BEEHIIV_WEBHOOK_SECRET` or `WC_WEBHOOK_SECRET`, the matching endpoints refuse
-every request, locally too. `WC_CONSUMER_KEY`/`WC_CONSUMER_SECRET` stay unset:
-the garden doesn't need WooCommerce API access.
+**Secrets are required.** Without `WP_APP_SHARED_SECRET` or
+`BEEHIIV_WEBHOOK_SECRET`, the matching endpoints refuse every request, locally
+too. Passes are signed with their own `GARDEN_PASS_SECRET` (32+ characters),
+so the WordPress secret can't be used to make them. `WC_CONSUMER_KEY`/
+`WC_CONSUMER_SECRET` stay unset: the garden doesn't need WooCommerce API
+access. The old store purchase webhook and admin seed route are gone.
+
+**If a reader's link leaks:** `node src/scripts/rotate-garden-token.js
+<subscriber-id>` gives them a new one (then run `sync-garden-links.js`).
 
 **Purchase points** are off in the plugin until switched on. Only linked
 participants' orders are sent (user ID, order number, total, currency), from a

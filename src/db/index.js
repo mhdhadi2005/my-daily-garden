@@ -73,6 +73,9 @@ function initSchema() {
     } catch (_) { /* already present */ }
   }
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_subscribers_garden_token ON subscribers(garden_token)");
+  // An order can only ever be credited once, whichever garden it went to.
+  try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_log_order ON purchase_log(order_id) WHERE order_id IS NOT NULL"); }
+  catch (err) { console.warn("purchase_log has duplicate order IDs; one-credit-per-order index not created:", err.message); }
   const missing = db.prepare("SELECT id FROM subscribers WHERE garden_token IS NULL").all();
   const give = db.prepare("UPDATE subscribers SET garden_token = ? WHERE id = ?");
   for (const { id } of missing) give.run(newGardenToken(), id);

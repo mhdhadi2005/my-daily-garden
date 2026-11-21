@@ -3,7 +3,7 @@
  * Plugin Name:       My Daily Garden
  * Plugin URI:        https://10almonds.com
  * Description:       Shows each logged-in reader their My Daily Garden (the almond tree they grow by reading the newsletter, and their forest) on their account page, and adds garden points for shop purchases.
- * Version:           1.1.0
+ * Version:           1.1.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            10almonds
@@ -27,7 +27,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MDG_VERSION', '1.1.0');
+define('MDG_VERSION', '1.1.1');
 define('MDG_OPTION', 'mdg_settings');
 define('MDG_DEFAULT_APP_URL', 'https://my-daily-garden-production.up.railway.app');
 define('MDG_ACCOUNT_ENDPOINT', 'my-garden');
@@ -329,7 +329,7 @@ register_deactivation_hook(__FILE__, function () {
 // Removes every queued purchase job, whatever order it was for.
 function mdg_clear_jobs() {
     if (function_exists('as_unschedule_all_actions')) {
-        as_unschedule_all_actions('mdg_send_purchase', array(), MDG_JOB_GROUP);
+        as_unschedule_all_actions('mdg_send_purchase'); // by hook alone, so every order's job goes, whatever its arguments
     }
     wp_unschedule_hook('mdg_send_purchase');
     wp_unschedule_hook('mdg_retry_purchase'); // the name version 1.0.0 used

@@ -22,7 +22,8 @@ fs.copyFileSync(backup, copy);
 
 const PORT = 3193, BASE = `http://127.0.0.1:${PORT}`;
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(WP_|BEEHIIV_|WC_|ADMIN_API|DB_PATH|PORT$)/.test(k)));
-const server = spawn(process.execPath, ["src/server.js"], { cwd: path.join(__dirname, "../.."), env: { ...env, PORT: String(PORT), DB_PATH: copy }, stdio: ["ignore", "pipe", "pipe"] });
+// Run from the temp folder, so the server can't pick up the real .env.
+const server = spawn(process.execPath, [path.join(__dirname, "../server.js")], { cwd: TMP, env: { ...env, PORT: String(PORT), DB_PATH: copy }, stdio: ["ignore", "pipe", "pipe"] });
 let log = "";
 server.stdout.on("data", (d) => (log += d));
 server.stderr.on("data", (d) => (log += d));

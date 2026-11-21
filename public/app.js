@@ -110,7 +110,7 @@
   function init() {
     const params = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.slice(1));
-    gardenPass = hash.get("pass") || params.get("pass");
+    gardenPass = hash.get("pass"); // only after the #, which never reaches a server
     gardenToken = params.get("t");
     realSubscriberId = params.get("subscriber");
     isRealMode = !!(gardenPass || gardenToken || realSubscriberId);
