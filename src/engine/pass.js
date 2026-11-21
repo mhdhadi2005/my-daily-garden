@@ -1,9 +1,13 @@
 // Short-lived signed passes, so the WordPress plugin can show a logged-in
 // reader their own garden without putting their subscriber ID in a link.
 //
-// A pass looks like  p1.<payload>.<signature>  and can be used anywhere the
-// page or the API takes a subscriber ID (see resolvePassParam). It names one
-// subscriber and expires; nobody can make or change one without the secret.
+// A pass looks like  p1.<payload>.<signature>. It names one subscriber and
+// expires; nobody can make or change one without the secret. It's the ONLY
+// thing the private garden routes accept as proof of who someone is: the
+// page sends it in the X-Garden-Pass header (so it stays out of URLs and
+// logs) and uses "me" in place of the ID in the path. Passes come from the
+// WordPress plugin (POST /api/wp/session) or from a reader's personal
+// newsletter link (POST /api/garden/session).
 
 const crypto = require("crypto");
 
@@ -40,12 +44,19 @@ function readPass(token, now = Date.now()) {
   }
 }
 
-// router.param handler: lets every /api/tree/:beehiivSubscriberId route take
-// a pass in place of the ID.
-function resolvePassParam(req, res, next, value) {
-  if (!isPass(value)) return next();
-  const id = readPass(value);
-  if (!id) return res.status(401).json({ error: "this garden link has expired — reopen your garden from your account page" });
+// router.param handler for every private /api/tree/:beehiivSubscriberId
+// route: the subscriber comes from a valid pass, never from the path. A raw
+// subscriber ID is refused, so knowing someone's ID gets you nowhere.
+function resolvePassParam(req, res, next) {
+  const token = String(req.headers["x-garden-pass"] || "");
+  const id = readPass(token);
+  if (!id) {
+    const expired = isPass(token);
+    return res.status(401).json({
+      error: expired ? "pass_expired" : "pass_required",
+      message: expired ? "This garden link has expired. Open your garden again from your newsletter or account page." : "Open your garden from the link in your newsletter or your account page.",
+    });
+  }
   req.params.beehiivSubscriberId = id;
   next();
 }

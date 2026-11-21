@@ -14,7 +14,7 @@ const { syncSubscriberStats } = require("../integrations/beehiiv");
 const { loadForest } = require("../engine/forest");
 
 const router = express.Router();
-router.param("beehiivSubscriberId", resolvePassParam); // a WordPress pass works wherever an ID does
+router.param("beehiivSubscriberId", resolvePassParam); // a valid pass (header) is required; raw IDs are refused
 
 const MAX_STAGE_INDEX = STAGES.length - 1;
 

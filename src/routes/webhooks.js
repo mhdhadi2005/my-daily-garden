@@ -18,7 +18,7 @@ const router = express.Router();
 // X-MDG-Secret with this same value as BEEHIIV_WEBHOOK_SECRET.
 function verifySignature(req) {
   const secret = process.env.BEEHIIV_WEBHOOK_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
+  if (!secret) return false; // no secret, no entry — locally too (set it in .env)
   const provided = req.headers["x-mdg-secret"];
   if (!provided) return false;
   const a = Buffer.from(provided);
@@ -62,7 +62,7 @@ router.post("/webhooks/beehiiv/open", (req, res) => {
 // Protected by BEEHIIV_WEBHOOK_SECRET as a bearer token.
 router.post("/api/seed-subscriber", (req, res) => {
   const auth = (req.headers["authorization"] || "").replace("Bearer ", "");
-  if (auth !== process.env.BEEHIIV_WEBHOOK_SECRET) {
+  if (!process.env.BEEHIIV_WEBHOOK_SECRET || auth !== process.env.BEEHIIV_WEBHOOK_SECRET) {
     return res.status(401).json({ error: "unauthorized" });
   }
   const { subscriber_id, email } = req.body || {};
@@ -79,7 +79,7 @@ router.post("/api/seed-subscriber", (req, res) => {
 // unlimited purchase points for free.
 function verifyWooSignature(req) {
   const secret = process.env.WC_WEBHOOK_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production"; // allow through in local dev only
+  if (!secret) return false; // no secret, no entry — locally too (set it in .env)
   const signature = req.headers["x-wc-webhook-signature"];
   if (!signature || !req.rawBody) return false;
   const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("base64");

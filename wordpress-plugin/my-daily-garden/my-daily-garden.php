@@ -3,7 +3,7 @@
  * Plugin Name:       My Daily Garden
  * Plugin URI:        https://10almonds.com
  * Description:       Shows each logged-in reader their My Daily Garden (the almond tree they grow by reading the newsletter, and their forest) on their account page, and adds garden points for shop purchases.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            10almonds
@@ -14,19 +14,25 @@
  * "garden app"). This plugin never trusts the browser: WordPress checks who
  * is logged in, then asks the garden app — signing each request with a
  * shared secret — for a short-lived pass to that reader's garden, and shows
- * the garden in a frame. Completed WooCommerce orders are reported the same
- * way, and each order earns points once.
+ * the garden in a sandboxed frame. Only accounts linked to a garden (by hand,
+ * for verified participants) get one.
+ *
+ * Purchase points are OFF unless switched on in the settings. When on, a
+ * completed order of a linked participant is sent from a background job (never
+ * inside order completion), without the customer's email, at most a few times,
+ * and the garden app counts each order once.
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MDG_VERSION', '1.0.0');
+define('MDG_VERSION', '1.1.0');
 define('MDG_OPTION', 'mdg_settings');
 define('MDG_DEFAULT_APP_URL', 'https://my-daily-garden-production.up.railway.app');
 define('MDG_ACCOUNT_ENDPOINT', 'my-garden');
 define('MDG_MAX_RETRIES', 5);
+define('MDG_JOB_GROUP', 'my-daily-garden');
 
 /* ── Settings ─────────────────────────────────────────────────────────── */
 
@@ -39,18 +45,23 @@ function mdg_settings() {
         'app_url'     => untrailingslashit(!empty($saved['app_url']) ? $saved['app_url'] : MDG_DEFAULT_APP_URL),
         'secret'      => isset($saved['secret']) ? (string) $saved['secret'] : '',
         'account_tab' => isset($saved['account_tab']) ? (int) $saved['account_tab'] : 1,
+        'purchases'   => !empty($saved['purchases']) ? 1 : 0,
     );
 }
 
 function mdg_sanitize_settings($input) {
     $old = get_option(MDG_OPTION, array());
     $out = array();
-    $url = isset($input['app_url']) ? esc_url_raw(trim((string) $input['app_url'])) : '';
+    $url = isset($input['app_url']) ? esc_url_raw(trim((string) $input['app_url']), array('https')) : '';
+    if ($url === '' && !empty($input['app_url'])) {
+        add_settings_error(MDG_OPTION, 'mdg_https', 'The garden app address must start with https://, so the default address was kept.');
+    }
     $out['app_url'] = $url !== '' ? untrailingslashit($url) : MDG_DEFAULT_APP_URL;
     // The secret field is always shown empty; leaving it empty keeps the saved one.
     $secret = isset($input['secret']) ? trim((string) $input['secret']) : '';
     $out['secret'] = $secret !== '' ? $secret : (is_array($old) && isset($old['secret']) ? (string) $old['secret'] : '');
     $out['account_tab'] = !empty($input['account_tab']) ? 1 : 0;
+    $out['purchases'] = !empty($input['purchases']) ? 1 : 0;
     return $out;
 }
 
@@ -104,11 +115,23 @@ function mdg_render_settings_page() {
                         </label>
                     </td>
                 </tr>
+                <tr>
+                    <th scope="row">Purchase points</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="<?php echo esc_attr(MDG_OPTION); ?>[purchases]" value="1" <?php checked($s['purchases'], 1); ?>>
+                            Give garden points for completed orders
+                        </label>
+                        <p class="description">Off until you’re ready. When on, completed orders of customers whose account is linked to a garden are sent in the background: user ID, order number, total and currency (no email, address or products). Guests and other customers are never sent.</p>
+                    </td>
+                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
         <h2>Showing the garden on another page</h2>
-        <p>Add the shortcode <code>[my_daily_garden]</code> to any page. Logged-in readers see their garden; everyone else sees a prompt to log in.</p>
+        <p>Add the shortcode <code>[my_daily_garden]</code> to any page. Logged-in readers whose account is linked to a garden see it; everyone else sees a short message.</p>
+        <h2>Stopping it</h2>
+        <p>Deactivating the plugin stops everything it sends and removes its queued jobs. To pause only purchase points, untick “Give garden points for completed orders”.</p>
     </div>
     <?php
 }
@@ -139,7 +162,10 @@ function mdg_post($path, $body) {
     }
     $json = wp_json_encode($body);
     $timestamp = (string) time();
-    $response = wp_remote_post($s['app_url'] . $path, array(
+    if (strpos($s['app_url'], 'https://') !== 0) {
+        return new WP_Error('mdg_not_https', 'The garden app address must use https.');
+    }
+    $response = wp_safe_remote_post($s['app_url'] . $path, array(
         'headers' => array(
             'Content-Type'   => 'application/json',
             'X-WP-Signature' => hash_hmac('sha256', $timestamp . ':' . $json, $s['secret']),
@@ -178,20 +204,20 @@ add_action('rest_api_init', function () {
 
 function mdg_rest_session() {
     $user = wp_get_current_user();
-    $data = mdg_post('/api/wp/session', array(
-        'wp_user_id' => (int) $user->ID,
-        'email'      => (string) $user->user_email,
-    ));
+    $data = mdg_post('/api/wp/session', array('wp_user_id' => (int) $user->ID)); // the user ID only: accounts are linked by hand
     if (is_wp_error($data)) {
         return new WP_REST_Response(array('error' => 'unavailable'), 502);
     }
     if (empty($data['linked']) || empty($data['pass'])) {
+        delete_user_meta($user->ID, '_mdg_linked');
         return rest_ensure_response(array('linked' => false));
     }
+    update_user_meta($user->ID, '_mdg_linked', 1); // purchase points are only ever sent for linked accounts
     $s = mdg_settings();
     return rest_ensure_response(array(
         'linked' => true,
-        'url'    => $s['app_url'] . '/?pass=' . rawurlencode($data['pass']),
+        // After the #, so the pass is never sent to any server or written to its logs.
+        'url'    => $s['app_url'] . '/#pass=' . rawurlencode($data['pass']),
     ));
 }
 
@@ -226,12 +252,14 @@ function mdg_render_garden() {
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
             .then(function (data) {
                 if (!data.linked) {
-                    say('Your garden starts when you click a link in the 10almonds newsletter. Come back after your next email, and your almond tree will be here!');
+                    say('Your garden isn’t connected to this account yet. If you read the 10almonds newsletter, your garden opens from the link in each email.');
                     return;
                 }
                 var frame = document.createElement('iframe');
                 frame.className = 'mdg-garden__frame';
                 frame.title = 'My Daily Garden';
+                frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+                frame.setAttribute('referrerpolicy', 'no-referrer');
                 frame.src = data.url;
                 root.replaceChild(frame, status);
             })
@@ -295,8 +323,17 @@ register_activation_hook(__FILE__, function () {
 
 register_deactivation_hook(__FILE__, function () {
     flush_rewrite_rules();
-    wp_clear_scheduled_hook('mdg_retry_purchase');
+    mdg_clear_jobs();
 });
+
+// Removes every queued purchase job, whatever order it was for.
+function mdg_clear_jobs() {
+    if (function_exists('as_unschedule_all_actions')) {
+        as_unschedule_all_actions('mdg_send_purchase', array(), MDG_JOB_GROUP);
+    }
+    wp_unschedule_hook('mdg_send_purchase');
+    wp_unschedule_hook('mdg_retry_purchase'); // the name version 1.0.0 used
+}
 
 /* ── Purchase points ──────────────────────────────────────────────────── */
 
@@ -307,11 +344,38 @@ add_action('before_woocommerce_init', function () {
     }
 });
 
-add_action('woocommerce_order_status_completed', 'mdg_send_purchase', 10, 1);
-add_action('mdg_retry_purchase', 'mdg_send_purchase', 10, 1);
+add_action('woocommerce_order_status_completed', 'mdg_queue_purchase', 10, 1);
+add_action('mdg_send_purchase', 'mdg_send_purchase', 10, 1);
+
+// Runs inside order completion, so it only queues a background job: the
+// garden app being slow or down can never hold up an order.
+function mdg_queue_purchase($order_id) {
+    $s = mdg_settings();
+    if (!$s['purchases'] || !function_exists('wc_get_order')) {
+        return;
+    }
+    $order = wc_get_order($order_id);
+    if (!$order || $order->get_meta('_mdg_points_sent')) {
+        return;
+    }
+    $customer = (int) $order->get_customer_id();
+    if (!$customer || !get_user_meta($customer, '_mdg_linked', true)) {
+        return; // guests and customers without a linked garden are never sent
+    }
+    mdg_schedule_send($order->get_id(), 0);
+}
+
+function mdg_schedule_send($order_id, $delay) {
+    if (function_exists('as_schedule_single_action')) {
+        as_schedule_single_action(time() + $delay, 'mdg_send_purchase', array((int) $order_id), MDG_JOB_GROUP);
+    } else {
+        wp_schedule_single_event(time() + $delay, 'mdg_send_purchase', array((int) $order_id));
+    }
+}
 
 function mdg_send_purchase($order_id) {
-    if (!function_exists('wc_get_order')) {
+    $s = mdg_settings();
+    if (!$s['purchases'] || !function_exists('wc_get_order')) {
         return;
     }
     $order = wc_get_order($order_id);
@@ -320,21 +384,21 @@ function mdg_send_purchase($order_id) {
     }
     $result = mdg_post('/api/wp/purchase', array(
         'wp_user_id' => (int) $order->get_customer_id(),
-        'email'      => (string) $order->get_billing_email(),
-        'order_id'   => 'wc_' . $order->get_id(),
+        'order_id'   => 'wc_' . $order->get_id(), // the same for every retry, so it only ever counts once
         'total'      => (float) $order->get_total(),
         'currency'   => (string) $order->get_currency(),
     ));
 
-    if (is_wp_error($result)) {
-        // The garden app may be asleep or restarting: try again later.
+    if (is_wp_error($result) || !array_key_exists('credited', $result)) {
+        // The garden app may be asleep or restarting: try again a few times, further apart each time.
         $tries = (int) $order->get_meta('_mdg_points_tries') + 1;
         $order->update_meta_data('_mdg_points_tries', $tries);
         $order->save();
         if ($tries < MDG_MAX_RETRIES) {
-            wp_schedule_single_event(time() + 600 * $tries, 'mdg_retry_purchase', array($order->get_id()));
+            mdg_schedule_send($order->get_id(), 600 * $tries);
         } else {
-            $order->add_order_note('My Daily Garden: couldn’t send this order’s garden points (' . $result->get_error_message() . ').');
+            $why = is_wp_error($result) ? $result->get_error_message() : 'unexpected reply';
+            $order->add_order_note('My Daily Garden: couldn’t send this order’s garden points (' . $why . ').');
         }
         return;
     }
@@ -343,7 +407,5 @@ function mdg_send_purchase($order_id) {
     $order->save();
     if (!empty($result['credited'])) {
         $order->add_order_note(sprintf('My Daily Garden: %s points added to the customer’s garden.', number_format_i18n((int) $result['pointsAwarded'])));
-    } elseif (!empty($result['reason']) && $result['reason'] !== 'already credited') {
-        $order->add_order_note('My Daily Garden: no points added — this customer hasn’t started a garden yet.');
     }
 }

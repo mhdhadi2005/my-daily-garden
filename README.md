@@ -82,6 +82,48 @@ npm start     # starts the real server on :3001
    written against their current documented formats, but it's worth
    confirming nothing's shifted before relying on it in production.
 
+## Access, linking and pilot operations
+
+**Who can open a garden.** The private garden routes (`/api/tree/me…`) accept
+only a signed, 12-hour pass in the `X-Garden-Pass` header. A raw subscriber ID
+is refused. Passes come from:
+- a reader's personal newsletter link, `/?t=<garden_token>`. Each reader has a
+  long random `garden_token`; put the custom field `garden_link` in beehiiv
+  (Audience → Custom fields), use `{{garden_link}}` as the garden link in the
+  newsletter, and run `node src/scripts/sync-garden-links.js` once to fill it
+  for existing readers (new readers get it automatically);
+- the WordPress plugin, for accounts linked to a garden. The plugin puts the
+  pass after `#` in the frame's address, so it never reaches a server log.
+
+**Linking accounts.** By hand, for verified participants:
+`node src/scripts/link-wp-user.js <subscriber-id> <wordpress-user-id>` (add
+`--unlink` to undo). Emails are never used to pick a garden; conflicting or
+ambiguous links are refused.
+
+**Secrets are required.** Without `WP_APP_SHARED_SECRET`,
+`BEEHIIV_WEBHOOK_SECRET` or `WC_WEBHOOK_SECRET`, the matching endpoints refuse
+every request, locally too. `WC_CONSUMER_KEY`/`WC_CONSUMER_SECRET` stay unset:
+the garden doesn't need WooCommerce API access.
+
+**Purchase points** are off in the plugin until switched on. Only linked
+participants' orders are sent (user ID, order number, total, currency), from a
+background job; each order counts once; free orders earn nothing; set
+`PURCHASE_CURRENCY` (e.g. `AUD`) to ignore other currencies.
+
+**Checks.** `node src/pilot-checks.js` starts throwaway servers on temporary
+databases and checks the access, secret, linking and purchase rules (it
+doesn't touch your data). Don't run `npm test` against a database you want to
+keep: it deletes `data/garden.db` first.
+
+**Backups.** The live database is SQLite on a Railway volume (`/data`,
+`DB_PATH`). To take a copy: pipe a script that runs
+`VACUUM INTO '/tmp/garden-backup.db'` and prints the file as base64 through
+`railway ssh -- node -`, then decode it locally. To prove a backup restores:
+`node src/scripts/restore-check.js <backup.db> <subscriber-id>`.
+
+**Stopping it.** Deactivating the WordPress plugin stops everything it sends
+and removes its queued jobs; unticking purchase points pauses only those.
+
 ## Environment variables
 
 Copy `.env.example` to `.env` and fill in as each piece comes online — see

@@ -1,4 +1,4 @@
-const { db } = require("../db");
+const { db, newGardenToken } = require("../db");
 const {
   POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS,
   REFERRAL_BONUS_POINTS,
@@ -14,24 +14,33 @@ const { syncSubscriberStats } = require("../integrations/beehiiv");
 // cause a webhook to fail or a click to go unrecorded. Fire-and-forget with
 // its own error handling, on purpose.
 function syncInBackground(sub, newStage) {
-  linkSubscriberIfPossible(db, sub).catch((err) => {
-    console.warn(`WooCommerce link skipped for subscriber ${sub.id}:`, err.message);
-  });
-  syncSubscriberStats(sub.beehiiv_subscriber_id, {
-    streak: sub.streak,
-    points: sub.points,
-    tree_stage: STAGES[newStage].name,
-  }).catch((err) => {
+  // Linking a newsletter reader to a shop account by email alone trusts an
+  // address nobody has verified, so it only runs when switched on deliberately.
+  if (process.env.WP_LINK_BY_EMAIL === "1") {
+    linkSubscriberIfPossible(db, sub).catch((err) => {
+      console.warn(`WooCommerce link skipped for subscriber ${sub.id}:`, err.message);
+    });
+  }
+  const fields = { streak: sub.streak, points: sub.points, tree_stage: STAGES[newStage].name };
+  const link = gardenLink(sub);
+  if (link) fields.garden_link = link; // newsletters link to the garden with {{garden_link}}
+  syncSubscriberStats(sub.beehiiv_subscriber_id, fields).catch((err) => {
     console.warn(`beehiiv sync skipped for subscriber ${sub.id}:`, err.message);
   });
+}
+
+// A reader's personal garden link: the garden's address plus their secret token.
+const APP_URL = (process.env.PUBLIC_APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "http://localhost:3001")).replace(/\/$/, "");
+function gardenLink(sub) {
+  return sub && sub.garden_token ? `${APP_URL}/?t=${sub.garden_token}` : null;
 }
 
 function getOrCreateSubscriber(beehiivSubscriberId, email) {
   let sub = db.prepare("SELECT * FROM subscribers WHERE beehiiv_subscriber_id = ?").get(beehiivSubscriberId);
   if (!sub) {
     const info = db.prepare(
-      "INSERT INTO subscribers (beehiiv_subscriber_id, email) VALUES (?, ?)"
-    ).run(beehiivSubscriberId, email || "");
+      "INSERT INTO subscribers (beehiiv_subscriber_id, email, garden_token) VALUES (?, ?, ?)"
+    ).run(beehiivSubscriberId, email || "", newGardenToken());
     sub = db.prepare("SELECT * FROM subscribers WHERE id = ?").get(info.lastInsertRowid);
   }
   return sub;
@@ -218,6 +227,7 @@ function creditReferrals({ subscriber, totalReferrals }) {
 }
 
 module.exports = {
+  gardenLink,
   getOrCreateSubscriber,
   recordClick,
   recordOpen,

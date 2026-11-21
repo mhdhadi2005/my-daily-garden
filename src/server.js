@@ -21,6 +21,16 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 
+// Basic protections on every response. Garden pages may be framed only by the
+// garden itself and 10almonds.com (the account page), and never send their
+// address (which can carry a reader's link or pass) to other sites.
+app.use((req, res, next) => {
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self' https://10almonds.com https://*.10almonds.com");
+  next();
+});
+
 const PUBLIC = path.join(__dirname, "..", "public");
 app.use(compressedStatic(PUBLIC, {
   longCache: (rel) => rel.startsWith("/forest3d/vendor/"), // three.js: only changes on an upgrade

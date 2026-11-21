@@ -16,6 +16,8 @@ const DEMO_COSMETICS = [
   { type: "fairy_lantern", label: "Fairy Lantern", icon: "🏮", rarity: "rare"  },
 ];
 
+const MAX_DEMO_HARVESTS = 12; // the demo slider goes to 9
+
 router.get("/api/demo/tree", (req, res) => {
   let stageIndex = parseInt(req.query.stage || 0, 10);
   if (isNaN(stageIndex) || stageIndex < 0) stageIndex = 0;
@@ -24,6 +26,7 @@ router.get("/api/demo/tree", (req, res) => {
   // ?harvests=N — simulate N completed tree cycles
   let totalHarvests = parseInt(req.query.harvests || 0, 10);
   if (isNaN(totalHarvests) || totalHarvests < 0) totalHarvests = 0;
+  totalHarvests = Math.min(totalHarvests, MAX_DEMO_HARVESTS); // it builds a forest of this size: keep it small
 
   const currentStage  = STAGES[stageIndex];
   const nextStageInfo = stageIndex + 1 < STAGES.length ? STAGES[stageIndex + 1] : null;

@@ -14,3 +14,8 @@ experiments/**/*.jpg
 experiments/**/*.gif
 experiments/**/__pycache__/
 experiments/old-forest-models/
+
+# Databases never belong in git (only synthetic test data was ever committed)
+*.db
+*.db-wal
+*.db-shm
