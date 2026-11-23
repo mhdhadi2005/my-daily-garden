@@ -53,10 +53,11 @@ function start(port, extraEnv, dbName) {
 }
 
 const json = async (res) => ({ status: res.status, body: await res.json().catch(() => ({})), headers: res.headers });
-// Each signed request gets a unique field, as real requests differ in time;
-// replays are tested separately with an exact copy.
-const signed = (base, p, body, secret, exact = false) => {
-  const raw = JSON.stringify(exact ? body : { ...body, _n: crypto.randomBytes(6).toString("hex") }), ts = String(Math.floor(Date.now() / 1000));
+// Signed exactly like the plugin's mdg_post(): the body plus a fresh
+// request_id (wp_generate_uuid4), signed with "<timestamp>:<json>".
+// exact = send this body as it is (to replay a request); ts = fix the second.
+const signed = (base, p, body, secret, exact = false, ts = String(Math.floor(Date.now() / 1000))) => {
+  const raw = JSON.stringify(exact ? body : { ...body, request_id: crypto.randomUUID() });
   const headers = { "Content-Type": "application/json" };
   if (secret) Object.assign(headers, { "X-WP-Signature": crypto.createHmac("sha256", secret).update(`${ts}:${raw}`).digest("hex"), "X-WP-Timestamp": ts });
   return fetch(base + p, { method: "POST", headers, body: raw }).then(json);
@@ -193,6 +194,45 @@ const garden = (base, p, pass, options = {}) =>
     const firstTime = await signed(A.base, "/api/wp/session", exact, S, true);
     const replay = await signed(A.base, "/api/wp/session", exact, S, true);
     check("a signed WordPress request can't be replayed", firstTime.status === 200 && replay.status === 401, `${firstTime.status} then ${replay.status}`);
+    const sameSecond = String(Math.floor(Date.now() / 1000));
+    const [twinA, twinB] = await Promise.all([signed(A.base, "/api/wp/session", { wp_user_id: 7 }, S, false, sameSecond), signed(A.base, "/api/wp/session", { wp_user_id: 7 }, S, false, sameSecond)]);
+    check("two genuine requests for the same reader in the same second are both accepted (plugin's request shape)", twinA.status === 200 && twinB.status === 200 && twinA.body.linked && twinB.body.linked, `${twinA.status}, ${twinB.status}`);
+    const php2 = fs.readFileSync(path.join(REPO, "wordpress-plugin/my-daily-garden/my-daily-garden.php"), "utf8");
+    check("the plugin adds a fresh request_id to every signed request", /\$body\['request_id'\] = wp_generate_uuid4\(\);\s*\$json = wp_json_encode\(\$body\);/.test(php2));
+
+    section("Purchase storage failures (engine, temporary database)");
+    const engineCheck = path.join(TMP, "engine-check.js");
+    fs.writeFileSync(engineCheck, `
+      const { db, initSchema } = require(${JSON.stringify(path.join(REPO, "src/db"))});
+      initSchema();
+      const { recordPurchase } = require(${JSON.stringify(path.join(REPO, "src/engine"))});
+      const ID = "sub_00000000-0000-4000-8000-0000000000f1";
+      db.prepare("INSERT INTO subscribers (beehiiv_subscriber_id, email, points) VALUES (?, 'f@example.com', 100)").run(ID);
+      const points = () => db.prepare("SELECT points FROM subscribers WHERE beehiiv_subscriber_id = ?").get(ID).points;
+      const logged = (o) => db.prepare("SELECT COUNT(*) AS n FROM purchase_log WHERE order_id = ?").get(o).n;
+      const attempt = (o) => { try { return { result: recordPurchase({ beehiivSubscriberId: ID, email: "", orderId: o, amount: 10 }) }; } catch (e) { return { error: e.message }; } };
+      const out = {};
+      db.exec("CREATE TRIGGER fail_log BEFORE INSERT ON purchase_log BEGIN SELECT RAISE(ABORT, 'simulated disk failure'); END");
+      const a = attempt("wc_901");
+      out.insertFailure = { threw: !!a.error, duplicate: !!(a.result && a.result.duplicate), points: points(), logged: logged("wc_901") };
+      db.exec("DROP TRIGGER fail_log");
+      db.exec("CREATE TRIGGER fail_points BEFORE UPDATE OF points ON subscribers BEGIN SELECT RAISE(ABORT, 'simulated failure after logging'); END");
+      const b = attempt("wc_902");
+      out.midwayFailure = { threw: !!b.error, points: points(), logged: logged("wc_902") };
+      db.exec("DROP TRIGGER fail_points");
+      const c = attempt("wc_902");
+      out.retry = { credited: !!(c.result && !c.result.duplicate), awarded: c.result && c.result.pointsAwarded, points: points(), logged: logged("wc_902") };
+      const d = attempt("wc_902");
+      out.duplicate = { duplicate: !!(d.result && d.result.duplicate), points: points(), logged: logged("wc_902") };
+      console.log(JSON.stringify(out));
+    `);
+    const engineOut = JSON.parse(execFileSync(process.execPath, [engineCheck], { cwd: TMP, env: { ...CLEAN_ENV, DB_PATH: path.join(TMP, "engine.db") }, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n").pop());
+    check("a storage error while logging an order is an error, not 'already credited'", engineOut.insertFailure.threw && !engineOut.insertFailure.duplicate && engineOut.insertFailure.points === 100 && engineOut.insertFailure.logged === 0, JSON.stringify(engineOut.insertFailure));
+    check("a failure between logging and adding points leaves nothing half-done", engineOut.midwayFailure.threw && engineOut.midwayFailure.points === 100 && engineOut.midwayFailure.logged === 0, JSON.stringify(engineOut.midwayFailure));
+    check("the retry after a failure credits the order once", engineOut.retry.credited && engineOut.retry.awarded === 1000 && engineOut.retry.points === 1100 && engineOut.retry.logged === 1, JSON.stringify(engineOut.retry));
+    check("only the real duplicate-order rule counts as 'already credited'", engineOut.duplicate.duplicate && engineOut.duplicate.points === 1100 && engineOut.duplicate.logged === 1, JSON.stringify(engineOut.duplicate));
+    const route = fs.readFileSync(path.join(REPO, "src/routes/wp-auth.js"), "utf8");
+    check("the purchase route turns a storage error into an error reply, so WordPress retries", /catch \(err\) \{[\s\S]*?status\(503\)/.test(route));
     check("no X-Powered-By header; HSTS on; framing only from 10almonds.com", !page.headers.get("x-powered-by") && /max-age=/.test(page.headers.get("strict-transport-security") || "") && !/\*\.10almonds/.test(page.headers.get("content-security-policy") || ""));
     const badJson = await fetch(`${A.base}/api/garden/session`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{not json" });
     const badText = await badJson.text();

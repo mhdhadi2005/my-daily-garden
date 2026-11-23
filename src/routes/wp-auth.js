@@ -126,7 +126,13 @@ router.post("/api/wp/purchase", (req, res) => {
   if (wanted && String(currency || "").toUpperCase() !== wanted) return res.json({ credited: false, reason: "other currency" });
   const seen = db.prepare("SELECT 1 FROM purchase_log WHERE order_id = ?").get(String(order_id));
   if (seen) return res.json({ credited: false, reason: "already credited" });
-  const result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  let result;
+  try {
+    result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  } catch (err) {
+    console.error(`Purchase ${order_id} not recorded:`, err.message);
+    return res.status(503).json({ error: "not_recorded" }); // WordPress tries again later
+  }
   if (result.duplicate) return res.json({ credited: false, reason: "already credited" });
   res.json({ credited: true, pointsAwarded: result.pointsAwarded, points: result.subscriber.points });
 });

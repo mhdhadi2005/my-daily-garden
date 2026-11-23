@@ -26,7 +26,13 @@ function syncInBackground(sub, newStage) {
 // A reader's personal garden link: the garden's address plus their secret token.
 const APP_URL = (process.env.PUBLIC_APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "http://localhost:3001")).replace(/\/$/, "");
 function gardenLink(sub) {
-  return sub && sub.garden_token ? `${APP_URL}/?t=${sub.garden_token}` : null;
+  return sub && sub.garden_token ? `${APP_URL}/#t=${sub.garden_token}` : null; // after #: never sent to a server or logged
+}
+
+// SQLite's UNIQUE constraint on purchase_log.order_id, and nothing else.
+function isDuplicateOrder(err) {
+  const text = `${err && err.code} ${err && err.errstr} ${err && err.message}`;
+  return /UNIQUE constraint failed: purchase_log\.order_id/.test(text) || (err && err.errcode === 2067 && /purchase_log/.test(text));
 }
 
 function getOrCreateSubscriber(beehiivSubscriberId, email) {
@@ -155,24 +161,32 @@ function recordQuizAnswer({ beehiivSubscriberId, email, quizId, correct }) {
 }
 
 /**
- * Called when a subscriber purchases a product (via store / WooCommerce webhook).
+ * Called when a linked participant's order is completed (POST /api/wp/purchase).
+ * The purchase record and the points go in together or not at all. Only the
+ * one-credit-per-order rule (the unique index on order_id) counts as
+ * "already credited"; any other storage error is thrown, so the request fails
+ * and WordPress retries it later instead of marking it sent.
  */
 function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
-  try {
-    db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
-      .run(sub.id, orderId || null, amount ? Number(amount) : null);
-  } catch (err) {
-    // The order is already in the log (the unique index): never credit it twice.
-    return { subscriber: sub, pointsAwarded: 0, stageChanged: false, newStage: stageForPoints(sub.points), duplicate: true };
-  }
-
   const pointsAwarded = pointsForPurchase(amount);
   const prevStage = stageForPoints(sub.points);
   const newPoints = sub.points + pointsAwarded;
   const newStage = stageForPoints(newPoints);
 
-  db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
+      .run(sub.id, orderId || null, amount ? Number(amount) : null);
+    db.prepare("UPDATE subscribers SET points = points + ? WHERE id = ?").run(pointsAwarded, sub.id);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    if (isDuplicateOrder(err)) {
+      return { subscriber: sub, pointsAwarded: 0, stageChanged: false, newStage: prevStage, duplicate: true };
+    }
+    throw err;
+  }
 
   const updatedSub = { ...sub, points: newPoints };
   syncInBackground(updatedSub, newStage);

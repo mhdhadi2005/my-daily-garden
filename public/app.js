@@ -111,7 +111,13 @@
     const params = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.slice(1));
     gardenPass = hash.get("pass"); // only after the #, which never reaches a server
-    gardenToken = params.get("t");
+    gardenToken = hash.get("t") || params.get("t"); // personal newsletter link: /#t=… (older /?t=… still works)
+    // A garden link opened in a tab already showing the garden only changes the
+    // part after #, which doesn't reload the page: reload so it opens that garden.
+    window.addEventListener("hashchange", () => {
+      const h = new URLSearchParams(window.location.hash.slice(1));
+      if (h.get("t") || h.get("pass")) window.location.reload();
+    });
     realSubscriberId = params.get("subscriber");
     isRealMode = !!(gardenPass || gardenToken || realSubscriberId);
     if (hash.get("pass")) history.replaceState(null, "", window.location.pathname + window.location.search); // keep the pass out of the address bar

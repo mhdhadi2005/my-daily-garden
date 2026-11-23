@@ -1,7 +1,7 @@
 === My Daily Garden ===
 Requires at least: 5.8
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 License: GPLv2 or later
 
 Shows linked participants their My Daily Garden on their account page, and can add garden points for their shop purchases.
@@ -40,6 +40,9 @@ When switched on, a completed order is queued as a background job (Action Schedu
 Deactivating the plugin stops everything it sends and removes its queued jobs. Unticking "Give garden points for completed orders" pauses purchase points only.
 
 == Changelog ==
+
+= 1.1.2 =
+* Every signed request carries a fresh request ID, so two genuine requests in the same second are no longer mistaken for a replay.
 
 = 1.1.1 =
 * Deactivating cancels every queued purchase job (by hook), and deleting the plugin removes its settings, secret and account marks (uninstall.php).

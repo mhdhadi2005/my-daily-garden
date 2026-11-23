@@ -3,7 +3,7 @@
  * Plugin Name:       My Daily Garden
  * Plugin URI:        https://10almonds.com
  * Description:       Shows each logged-in reader their My Daily Garden (the almond tree they grow by reading the newsletter, and their forest) on their account page, and adds garden points for shop purchases.
- * Version:           1.1.1
+ * Version:           1.1.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            10almonds
@@ -27,7 +27,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MDG_VERSION', '1.1.1');
+define('MDG_VERSION', '1.1.2');
 define('MDG_OPTION', 'mdg_settings');
 define('MDG_DEFAULT_APP_URL', 'https://my-daily-garden-production.up.railway.app');
 define('MDG_ACCOUNT_ENDPOINT', 'my-garden');
@@ -160,6 +160,9 @@ function mdg_post($path, $body) {
     if ($s['secret'] === '') {
         return new WP_Error('mdg_not_configured', 'The shared secret isn’t set (Settings → My Daily Garden).');
     }
+    // A fresh ID in every request: two genuine requests in the same second then
+    // differ, while an exact copy (a replay) is still refused by the garden app.
+    $body['request_id'] = wp_generate_uuid4();
     $json = wp_json_encode($body);
     $timestamp = (string) time();
     if (strpos($s['app_url'], 'https://') !== 0) {
