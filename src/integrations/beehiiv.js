@@ -31,7 +31,7 @@ function assertConfigured() {
  */
 async function syncSubscriberStats(beehiivSubscriberId, fields) {
   assertConfigured();
-  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${beehiivSubscriberId}`;
+  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${encodeURIComponent(beehiivSubscriberId)}`;
 
   const custom_fields = Object.entries(fields).map(([name, value]) => ({ name, value }));
 
@@ -67,7 +67,7 @@ async function syncSubscriberStats(beehiivSubscriberId, fields) {
  */
 async function fetchClickTotal(beehiivSubscriberId) {
   assertConfigured();
-  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${beehiivSubscriberId}?expand=stats`;
+  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${encodeURIComponent(beehiivSubscriberId)}?expand=stats`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${API_KEY}` } });
   if (!res.ok) {
     throw new Error(`beehiiv stats fetch failed: ${res.status} ${res.statusText}`);
@@ -91,7 +91,7 @@ async function fetchClickTotal(beehiivSubscriberId) {
  */
 async function fetchReferralCount(beehiivSubscriberId) {
   assertConfigured();
-  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${beehiivSubscriberId}?expand[]=referrals`;
+  const url = `https://api.beehiiv.com/v2/publications/${PUBLICATION_ID}/subscriptions/${encodeURIComponent(beehiivSubscriberId)}?expand[]=referrals`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${API_KEY}` } });
   if (!res.ok) {
     throw new Error(`beehiiv referral fetch failed: ${res.status} ${res.statusText}`);

@@ -38,7 +38,7 @@ async function main() {
   }
 
   // 2. List a few subscribers, so we can see the real shape of subscriber
-  //    data (custom fields, stats, etc.) — this is what our woocommerce.js/
+  //    data (custom fields, stats, etc.) — this is what our
   //    beehiiv.js code needs to match.
   console.log("\n--- Fetching up to 3 subscribers (to inspect real field names) ---");
   const subsRes = await fetch(

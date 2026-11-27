@@ -18,7 +18,7 @@ const SHARED_SECRET = process.env.WP_APP_SHARED_SECRET;
 const MAX_REQUEST_AGE_SECONDS = 60; // rejects replayed requests older than this
 
 function verifyWpSignature(req) {
-  if (!SHARED_SECRET) return process.env.NODE_ENV !== "production"; // dev-only bypass
+  if (!SHARED_SECRET) return false; // no secret, no entry — locally too (set it in .env)
   const signature = req.headers["x-wp-signature"];
   const timestamp = req.headers["x-wp-timestamp"];
   if (!signature || !timestamp) return false;
@@ -37,12 +37,21 @@ function verifyWpSignature(req) {
   const payload = `${timestamp}:${raw}`;
   const expected = crypto.createHmac("sha256", SHARED_SECRET).update(payload).digest("hex");
 
+  let ok = false;
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    ok = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
     return false; // signature was malformed / wrong length — reject, don't throw
   }
+  if (!ok) return false;
+  // Each signed request works once: a copy replayed inside the time window is refused.
+  const now = Date.now();
+  for (const [sig, at] of seenSignatures) if (now - at > 2 * MAX_REQUEST_AGE_SECONDS * 1000) seenSignatures.delete(sig);
+  if (seenSignatures.has(signature)) return false;
+  seenSignatures.set(signature, now);
+  return true;
 }
+const seenSignatures = new Map(); // signature → when it was first seen
 
 // POST /api/wp/tree-status  { wp_user_id }
 // Called by WordPress on behalf of whichever subscriber is actually logged
@@ -53,7 +62,7 @@ router.post("/api/wp/tree-status", (req, res) => {
   const { wp_user_id } = req.body || {};
   if (!wp_user_id) return res.status(400).json({ error: "missing wp_user_id" });
 
-  const sub = db.prepare("SELECT * FROM subscribers WHERE wp_user_id = ?").get(wp_user_id);
+  const sub = findGarden(wp_user_id);
   if (!sub) {
     // Not an error — she may be logged in and have an account, but hasn't
     // clicked anything from an email yet, so no garden record exists.
@@ -73,23 +82,15 @@ router.post("/api/wp/tree-status", (req, res) => {
   });
 });
 
-// The garden of a WordPress user: already linked by user ID, or else the
-// subscriber with the same email, which gets linked now. null if this
-// person hasn't started a garden (no newsletter click yet).
-function findGarden(wpUserId, email) {
+// The garden linked to a WordPress user, or null. Linking is done by hand
+// for verified participants (src/scripts/link-wp-user.js): an account's
+// email isn't proof its owner gets that newsletter, so it's never used to
+// pick a garden. More than one garden on the same account is refused too.
+function findGarden(wpUserId) {
   const id = Number(wpUserId) || 0;
-  if (id) {
-    const linked = db.prepare("SELECT * FROM subscribers WHERE wp_user_id = ?").get(id);
-    if (linked) return linked;
-  }
-  const mail = String(email || "").trim().toLowerCase();
-  if (!mail) return null;
-  const byEmail = db.prepare("SELECT * FROM subscribers WHERE lower(email) = ? ORDER BY id LIMIT 1").get(mail);
-  if (byEmail && id && !byEmail.wp_user_id) {
-    db.prepare("UPDATE subscribers SET wp_user_id = ? WHERE id = ?").run(id, byEmail.id);
-    return { ...byEmail, wp_user_id: id };
-  }
-  return byEmail || null;
+  if (!id) return null;
+  const linked = db.prepare("SELECT * FROM subscribers WHERE wp_user_id = ?").all(id);
+  return linked.length === 1 ? linked[0] : null;
 }
 
 // POST /api/wp/ping — the plugin's settings page checks the address and secret.
@@ -98,29 +99,41 @@ router.post("/api/wp/ping", (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/wp/session  { wp_user_id, email }
+// POST /api/wp/session  { wp_user_id }
 // The plugin asks for a pass to show this logged-in reader their garden.
 router.post("/api/wp/session", (req, res) => {
   if (!verifyWpSignature(req)) return res.status(401).json({ error: "invalid or missing signature" });
-  const { wp_user_id, email } = req.body || {};
-  if (!wp_user_id && !email) return res.status(400).json({ error: "missing wp_user_id or email" });
-  const sub = findGarden(wp_user_id, email);
+  const { wp_user_id } = req.body || {};
+  if (!wp_user_id) return res.status(400).json({ error: "missing wp_user_id" });
+  const sub = findGarden(wp_user_id);
   if (!sub) return res.json({ linked: false });
   res.json({ linked: true, ...createPass(sub.beehiiv_subscriber_id) });
 });
 
-// POST /api/wp/purchase  { wp_user_id, email, order_id, total, currency }
-// A WooCommerce order was completed. Points go to the buyer's garden, once
-// per order however often WordPress reports it.
+// POST /api/wp/purchase  { wp_user_id, order_id, total, currency }
+// A WooCommerce order was completed by a linked participant. Points go to
+// their garden, once per order however often WordPress reports it. Only the
+// linked account counts (never an email match), free orders earn nothing,
+// and if PURCHASE_CURRENCY is set, other currencies earn nothing.
 router.post("/api/wp/purchase", (req, res) => {
   if (!verifyWpSignature(req)) return res.status(401).json({ error: "invalid or missing signature" });
-  const { wp_user_id, email, order_id, total } = req.body || {};
+  const { wp_user_id, order_id, total, currency } = req.body || {};
   if (!order_id) return res.status(400).json({ error: "missing order_id" });
-  const sub = findGarden(wp_user_id, email);
-  if (!sub) return res.json({ credited: false, reason: "no garden for this customer yet" });
-  const seen = db.prepare("SELECT 1 FROM purchase_log WHERE subscriber_id = ? AND order_id = ?").get(sub.id, String(order_id));
+  const sub = findGarden(wp_user_id);
+  if (!sub) return res.json({ credited: false, reason: "no garden for this customer" });
+  if (!(Number(total) > 0)) return res.json({ credited: false, reason: "free order" });
+  const wanted = (process.env.PURCHASE_CURRENCY || "").toUpperCase();
+  if (wanted && String(currency || "").toUpperCase() !== wanted) return res.json({ credited: false, reason: "other currency" });
+  const seen = db.prepare("SELECT 1 FROM purchase_log WHERE order_id = ?").get(String(order_id));
   if (seen) return res.json({ credited: false, reason: "already credited" });
-  const result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  let result;
+  try {
+    result = recordPurchase({ beehiivSubscriberId: sub.beehiiv_subscriber_id, email: sub.email, orderId: String(order_id), amount: total });
+  } catch (err) {
+    console.error(`Purchase ${order_id} not recorded:`, err.message);
+    return res.status(503).json({ error: "not_recorded" }); // WordPress tries again later
+  }
+  if (result.duplicate) return res.json({ credited: false, reason: "already credited" });
   res.json({ credited: true, pointsAwarded: result.pointsAwarded, points: result.subscriber.points });
 });
 

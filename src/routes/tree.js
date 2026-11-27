@@ -1,12 +1,21 @@
 const express = require("express");
-const { resolvePassParam } = require("../engine/pass");
+const { resolvePassParam, createPass } = require("../engine/pass");
 const { db } = require("../db");
 const { STAGES, COSMETICS, stageForPoints, POINT_VALUES, streakStatus } = require("../engine/config");
 const { loadForest, moveTree, setWater, readWater } = require("../engine/forest");
 
 
 const router = express.Router();
-router.param("beehiivSubscriberId", resolvePassParam); // a WordPress pass works wherever an ID does
+router.param("beehiivSubscriberId", resolvePassParam); // a valid pass (header) is required; raw IDs are refused
+
+// POST /api/garden/session  { token }
+// A reader's personal newsletter link (/?t=<token>) swapped for a pass.
+router.post("/api/garden/session", (req, res) => {
+  const token = String((req.body && req.body.token) || "");
+  const sub = token.length >= 24 ? db.prepare("SELECT beehiiv_subscriber_id FROM subscribers WHERE garden_token = ?").get(token) : null;
+  if (!sub) return res.status(404).json({ error: "unknown_link", message: "This garden link doesn't work. Open your garden from your latest newsletter." });
+  res.json(createPass(sub.beehiiv_subscriber_id));
+});
 
 const MAX_STAGE_INDEX = STAGES.length - 1;
 

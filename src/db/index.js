@@ -1,5 +1,6 @@
 const { DatabaseSync } = require("node:sqlite");
 const fs = require("fs");
+const crypto = require("crypto");
 const path = require("path");
 
 // Local dev uses SQLite so this runs with zero setup — using Node's built-in
@@ -56,6 +57,10 @@ const ADDED_COLUMNS = [
   ["harvests", "hex_r", "INTEGER"],
   // Water tiles the reader has added to their forest: JSON list of [q, r].
   ["subscribers", "forest_water", "TEXT"],
+  // The secret in each reader's personal garden link (newsletter emails link
+  // to /?t=<token>). Unguessable, unlike the beehiiv subscriber ID, which the
+  // garden no longer accepts as proof of who someone is.
+  ["subscribers", "garden_token", "TEXT"],
 ];
 
 function initSchema() {
@@ -67,6 +72,15 @@ function initSchema() {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     } catch (_) { /* already present */ }
   }
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_subscribers_garden_token ON subscribers(garden_token)");
+  // An order can only ever be credited once, whichever garden it went to.
+  try { db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_log_order ON purchase_log(order_id) WHERE order_id IS NOT NULL"); }
+  catch (err) { console.warn("purchase_log has duplicate order IDs; one-credit-per-order index not created:", err.message); }
+  const missing = db.prepare("SELECT id FROM subscribers WHERE garden_token IS NULL").all();
+  const give = db.prepare("UPDATE subscribers SET garden_token = ? WHERE id = ?");
+  for (const { id } of missing) give.run(newGardenToken(), id);
 }
 
-module.exports = { db, initSchema };
+const newGardenToken = () => crypto.randomBytes(24).toString("base64url");
+
+module.exports = { db, initSchema, newGardenToken };

@@ -1,11 +1,10 @@
-const { db } = require("../db");
+const { db, newGardenToken } = require("../db");
 const {
   POINTS_PER_CLICK, DAILY_CLICK_CAP, OPEN_BONUS_POINTS, QUIZ_CORRECT_BONUS,
   REFERRAL_BONUS_POINTS,
   stageForPoints, pointsForPurchase, STAGES, rollReward, todayStr, daysBetween,
 } = require("./config");
 
-const { linkSubscriberIfPossible } = require("../integrations/woocommerce");
 const { syncSubscriberStats } = require("../integrations/beehiiv");
 
 // Both integrations are best-effort side effects, not part of the critical
@@ -14,24 +13,34 @@ const { syncSubscriberStats } = require("../integrations/beehiiv");
 // cause a webhook to fail or a click to go unrecorded. Fire-and-forget with
 // its own error handling, on purpose.
 function syncInBackground(sub, newStage) {
-  linkSubscriberIfPossible(db, sub).catch((err) => {
-    console.warn(`WooCommerce link skipped for subscriber ${sub.id}:`, err.message);
-  });
-  syncSubscriberStats(sub.beehiiv_subscriber_id, {
-    streak: sub.streak,
-    points: sub.points,
-    tree_stage: STAGES[newStage].name,
-  }).catch((err) => {
+  // (Readers are never linked to shop accounts by email: an address nobody
+  // has verified isn't proof of who someone is. Linking is done by hand.)
+  const fields = { streak: sub.streak, points: sub.points, tree_stage: STAGES[newStage].name };
+  const link = gardenLink(sub);
+  if (link) fields.garden_link = link; // newsletters link to the garden with {{garden_link}}
+  syncSubscriberStats(sub.beehiiv_subscriber_id, fields).catch((err) => {
     console.warn(`beehiiv sync skipped for subscriber ${sub.id}:`, err.message);
   });
+}
+
+// A reader's personal garden link: the garden's address plus their secret token.
+const APP_URL = (process.env.PUBLIC_APP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "http://localhost:3001")).replace(/\/$/, "");
+function gardenLink(sub) {
+  return sub && sub.garden_token ? `${APP_URL}/#t=${sub.garden_token}` : null; // after #: never sent to a server or logged
+}
+
+// SQLite's UNIQUE constraint on purchase_log.order_id, and nothing else.
+function isDuplicateOrder(err) {
+  const text = `${err && err.code} ${err && err.errstr} ${err && err.message}`;
+  return /UNIQUE constraint failed: purchase_log\.order_id/.test(text) || (err && err.errcode === 2067 && /purchase_log/.test(text));
 }
 
 function getOrCreateSubscriber(beehiivSubscriberId, email) {
   let sub = db.prepare("SELECT * FROM subscribers WHERE beehiiv_subscriber_id = ?").get(beehiivSubscriberId);
   if (!sub) {
     const info = db.prepare(
-      "INSERT INTO subscribers (beehiiv_subscriber_id, email) VALUES (?, ?)"
-    ).run(beehiivSubscriberId, email || "");
+      "INSERT INTO subscribers (beehiiv_subscriber_id, email, garden_token) VALUES (?, ?, ?)"
+    ).run(beehiivSubscriberId, email || "", newGardenToken());
     sub = db.prepare("SELECT * FROM subscribers WHERE id = ?").get(info.lastInsertRowid);
   }
   return sub;
@@ -118,7 +127,11 @@ function recordClick({ beehiivSubscriberId, email, linkUrl, linkId }) {
  */
 function recordOpen({ beehiivSubscriberId, email }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
+  // Only the first open of the day earns points: beehiiv can fire the same
+  // automation more than once, and opens shouldn't be farmable.
+  const openedToday = db.prepare("SELECT 1 FROM open_log WHERE subscriber_id = ? AND date(opened_at) = date('now')").get(sub.id);
   db.prepare("INSERT INTO open_log (subscriber_id) VALUES (?)").run(sub.id);
+  if (openedToday) return { subscriber: sub, pointsAwarded: 0, counted: false };
   const newPoints = sub.points + OPEN_BONUS_POINTS;
   db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
   return { subscriber: { ...sub, points: newPoints }, pointsAwarded: OPEN_BONUS_POINTS };
@@ -132,6 +145,10 @@ function recordOpen({ beehiivSubscriberId, email }) {
  */
 function recordQuizAnswer({ beehiivSubscriberId, email, quizId, correct }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
+  // One answer per quiz counts; repeats (or a second try) earn nothing.
+  if (db.prepare("SELECT 1 FROM quiz_response_log WHERE subscriber_id = ? AND quiz_id = ?").get(sub.id, String(quizId))) {
+    return { subscriber: sub, pointsAwarded: 0, counted: false };
+  }
   db.prepare(
     "INSERT INTO quiz_response_log (subscriber_id, quiz_id, correct) VALUES (?, ?, ?)"
   ).run(sub.id, quizId, correct ? 1 : 0);
@@ -144,23 +161,32 @@ function recordQuizAnswer({ beehiivSubscriberId, email, quizId, correct }) {
 }
 
 /**
- * Called when a subscriber purchases a product (via store / WooCommerce webhook).
+ * Called when a linked participant's order is completed (POST /api/wp/purchase).
+ * The purchase record and the points go in together or not at all. Only the
+ * one-credit-per-order rule (the unique index on order_id) counts as
+ * "already credited"; any other storage error is thrown, so the request fails
+ * and WordPress retries it later instead of marking it sent.
  */
 function recordPurchase({ beehiivSubscriberId, email, orderId, amount }) {
   const sub = getOrCreateSubscriber(beehiivSubscriberId, email);
-  try {
-    db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
-      .run(sub.id, orderId || null, amount ? Number(amount) : null);
-  } catch (err) {
-    console.warn("Could not insert purchase_log:", err.message);
-  }
-
   const pointsAwarded = pointsForPurchase(amount);
   const prevStage = stageForPoints(sub.points);
   const newPoints = sub.points + pointsAwarded;
   const newStage = stageForPoints(newPoints);
 
-  db.prepare("UPDATE subscribers SET points = ? WHERE id = ?").run(newPoints, sub.id);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.prepare("INSERT INTO purchase_log (subscriber_id, order_id, amount) VALUES (?, ?, ?)")
+      .run(sub.id, orderId || null, amount ? Number(amount) : null);
+    db.prepare("UPDATE subscribers SET points = points + ? WHERE id = ?").run(pointsAwarded, sub.id);
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    if (isDuplicateOrder(err)) {
+      return { subscriber: sub, pointsAwarded: 0, stageChanged: false, newStage: prevStage, duplicate: true };
+    }
+    throw err;
+  }
 
   const updatedSub = { ...sub, points: newPoints };
   syncInBackground(updatedSub, newStage);
@@ -218,6 +244,7 @@ function creditReferrals({ subscriber, totalReferrals }) {
 }
 
 module.exports = {
+  gardenLink,
   getOrCreateSubscriber,
   recordClick,
   recordOpen,

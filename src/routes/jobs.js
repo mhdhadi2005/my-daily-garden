@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const { runReferralSweep } = require("../jobs/referrals");
 
 const router = express.Router();
@@ -11,8 +12,9 @@ const router = express.Router();
 function isAuthorised(req) {
   const secret = process.env.ADMIN_API_SECRET;
   if (!secret) return false;
-  const provided = (req.headers["authorization"] || "").replace("Bearer ", "");
-  return provided === secret;
+  const provided = Buffer.from((req.headers["authorization"] || "").replace("Bearer ", ""));
+  const wanted = Buffer.from(secret);
+  return provided.length === wanted.length && crypto.timingSafeEqual(provided, wanted);
 }
 
 // POST /api/jobs/referrals — sweep beehiiv for new referrals and award points.

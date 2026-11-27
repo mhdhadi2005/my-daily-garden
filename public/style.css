@@ -2248,3 +2248,22 @@ body {
   letter-spacing: 0.04em;
 }
 
+
+/* Shown instead of a garden when the link can't open one */
+.garden-message {
+  position: relative;
+  z-index: 2;
+  max-width: 440px;
+  margin: 24px auto 0;
+  padding: 18px 20px;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(38, 42, 69, 0.15);
+}
+.has-garden-message .app-container > :not(.garden-message),
+.has-garden-message .particle-container { display: none; }
+.has-garden-message .garden-message { margin-top: 30vh; }

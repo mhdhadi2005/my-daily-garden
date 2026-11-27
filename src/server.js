@@ -14,12 +14,24 @@ const { compressedStatic } = require("./static-compressed");
 initSchema();
 
 const app = express();
+app.disable("x-powered-by");
 
 // Keep the raw body around for webhook signature verification, while still
 // parsing JSON normally for every route.
 app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
+
+// Basic protections on every response. Garden pages may be framed only by the
+// garden itself and 10almonds.com (the account page), and never send their
+// address (which can carry a reader's link or pass) to other sites.
+app.use((req, res, next) => {
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Strict-Transport-Security", "max-age=15552000");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self' https://10almonds.com https://www.10almonds.com; object-src 'none'; base-uri 'self'");
+  next();
+});
 
 const PUBLIC = path.join(__dirname, "..", "public");
 app.use(compressedStatic(PUBLIC, {
@@ -36,6 +48,14 @@ app.use(jobRoutes);
 
 
 app.get("/health", (req, res) => res.json({ ok: true }));
+
+// Errors (e.g. a malformed JSON body) get a short reply, never a stack trace.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error(err);
+  res.status(status).json({ error: err.type === "entity.parse.failed" ? "bad_json" : status >= 500 ? "server_error" : "bad_request" });
+});
 
 const PORT = process.env.PORT || 3001;
 if (require.main === module) {

@@ -52,7 +52,13 @@
   // Without this, dragging the slider could leave the page showing a stage
   // the slider passed through mid-drag rather than where it was released.
   let renderRequestId    = 0;
-  let realSubscriberId  = null;
+  // A real reader's garden opens only with proof of who they are: a signed
+  // pass (from the WordPress account page, in the address's #pass= part) or
+  // their personal newsletter link (?t=<token>), which is swapped for a pass.
+  // The pass goes in a header on every request, never in a URL.
+  let gardenPass  = null;
+  let gardenToken = null;
+  let realSubscriberId  = null; // only an old-style ?subscriber= link: no longer opens a garden
 
   // ── DOM Elements ──
   const $stageName        = document.getElementById("stage-name");
@@ -103,10 +109,18 @@
   // ── Initialization ──
   function init() {
     const params = new URLSearchParams(window.location.search);
-    // ?subscriber=<id> from newsletter links, or ?pass=<signed pass> when the
-    // WordPress plugin shows the garden on a reader's account page.
-    realSubscriberId = params.get("subscriber") || params.get("pass");
-    isRealMode = !!realSubscriberId;
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    gardenPass = hash.get("pass"); // only after the #, which never reaches a server
+    gardenToken = hash.get("t") || params.get("t"); // personal newsletter link: /#t=… (older /?t=… still works)
+    // A garden link opened in a tab already showing the garden only changes the
+    // part after #, which doesn't reload the page: reload so it opens that garden.
+    window.addEventListener("hashchange", () => {
+      const h = new URLSearchParams(window.location.hash.slice(1));
+      if (h.get("t") || h.get("pass")) window.location.reload();
+    });
+    realSubscriberId = params.get("subscriber");
+    isRealMode = !!(gardenPass || gardenToken || realSubscriberId);
+    if (hash.get("pass")) history.replaceState(null, "", window.location.pathname + window.location.search); // keep the pass out of the address bar
 
     if (isRealMode) {
       document.getElementById("demo-controls").style.display = "none";
@@ -121,15 +135,57 @@
   }
 
   // ── Data Fetching ──
-  async function fetchTreeData(stageIndex) {
-    let url;
-    if (isRealMode) {
-      url = REAL_API + encodeURIComponent(realSubscriberId);
-    } else {
-      url = `${DEMO_API}?stage=${stageIndex}&harvests=${demoHarvests}&streakState=${demoStreakState}`;
+
+  // Swaps the reader's personal newsletter link for a pass.
+  async function passFromToken() {
+    if (!gardenToken) return null;
+    const res = await fetch("/api/garden/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: gardenToken }) });
+    if (!res.ok) return null;
+    return (await res.json()).pass || null;
+  }
+
+  // A request to the reader's own garden: /api/tree/me…, with their pass.
+  // If the pass has run out and they came from their newsletter link, a new
+  // one is fetched once and the request retried.
+  async function gardenFetch(path, options = {}) {
+    if (!gardenPass) gardenPass = await passFromToken();
+    if (!gardenPass) return new Response(JSON.stringify({ error: "pass_required" }), { status: 401 });
+    const send = () => fetch(`${REAL_API}me${path}`, { ...options, headers: { ...(options.headers || {}), "X-Garden-Pass": gardenPass } });
+    let res = await send();
+    if (res.status === 401 && gardenToken) {
+      gardenPass = await passFromToken();
+      if (gardenPass) res = await send();
     }
+    return res;
+  }
+
+  function showGardenMessage(text) {
+    if (document.querySelector(".garden-message")) return;
+    const box = document.createElement("div");
+    box.className = "garden-message";
+    box.setAttribute("role", "status");
+    box.textContent = text;
+    const host = document.querySelector(".app-container") || document.body;
+    host.insertBefore(box, host.firstChild);
+    document.body.classList.add("has-garden-message"); // hides the never-ending "Loading…"
+  }
+
+  async function fetchTreeData(stageIndex) {
     try {
-      const res = await fetch(url);
+      if (isRealMode) {
+        if (!gardenPass && !gardenToken) {
+          showGardenMessage("This link no longer opens a garden. Please use the garden link in your latest 10almonds newsletter, or open My Garden on your 10almonds account.");
+          return null;
+        }
+        const res = await gardenFetch("");
+        if (res.status === 401 || res.status === 404) {
+          showGardenMessage("This garden link has expired or doesn't work. Please open your garden again from your latest newsletter or your 10almonds account.");
+          return null;
+        }
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+        return await res.json();
+      }
+      const res = await fetch(`${DEMO_API}?stage=${stageIndex}&harvests=${demoHarvests}&streakState=${demoStreakState}`);
       if (!res.ok) throw new Error(`API returned ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -385,7 +441,7 @@
   }
 
   function markViewed() {
-    fetch(`/api/tree/${encodeURIComponent(realSubscriberId)}/viewed`, { method: "POST" })
+    gardenFetch("/viewed", { method: "POST" })
       .catch((err) => console.error("Failed to record visit:", err));
   }
 
@@ -1247,7 +1303,7 @@
     if (isRealMode) {
       s.busy = true;
       try {
-        const res = await fetch(`${REAL_API}${encodeURIComponent(realSubscriberId)}/forest/move`, {
+        const res = await gardenFetch("/forest/move", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ harvestNumber: s.selected, q, r }),
@@ -1284,7 +1340,7 @@
     if (isRealMode) {
       s.busy = true;
       try {
-        const res = await fetch(`${REAL_API}${encodeURIComponent(realSubscriberId)}/forest/water`, {
+        const res = await gardenFetch("/forest/water", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ q, r, add }),
@@ -1362,12 +1418,11 @@
     if (!$harvestBtn || !$harvestContinue) return; // embed.html has no harvest UI
     $harvestBtn.addEventListener("click", async () => {
       if (!isRealMode) { demoHarvest(); return; }
-      if (!realSubscriberId) return;
       $harvestBtn.disabled = true;
       $harvestBtn.textContent = "Harvesting…";
 
       try {
-        const res = await fetch(`/api/tree/${encodeURIComponent(realSubscriberId)}/harvest`, { method: "POST" });
+        const res = await gardenFetch("/harvest", { method: "POST" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const result = await res.json();
         showHarvestCelebration(result);
