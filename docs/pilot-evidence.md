@@ -25,7 +25,7 @@ Response to "My Daily Garden: proportionate risk assessment for 10almonds.com" (
 - Public demo caps the forest at 12 trees (the slider goes to 9).
 - Deactivation removes all queued jobs (`as_unschedule_all_actions`, `wp_unschedule_hook`), whatever order they were for.
 - The database files under `mdg-zip/data/` held one made-up reader (`test@example.com`, from the smoke test). Removed from the repository, and `*.db` files are now ignored.
-- Every response sends `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: frame-ancestors 'self' https://10almonds.com https://*.10almonds.com`. The plugin's frame is sandboxed (`allow-scripts allow-same-origin`) and sends no referrer. The pass travels after `#`, so it never reaches a server log, and the page removes it from its own address once read.
+- Every response sends `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: frame-ancestors 'self' https://10almonds.com https://www.10almonds.com https://staging.10almonds.com`. The plugin's frame is sandboxed (`allow-scripts allow-same-origin`) and sends no referrer. The pass travels after `#`, so it never reaches a server log, and the page removes it from its own address once read.
 
 ## Data record (pilot)
 
@@ -74,7 +74,7 @@ A separate reviewer audited this branch from scratch. What it found, and what wa
 | 8 | The check script loaded the real `.env`. | Servers now run from a temp folder with no `.env`. |
 | 9 | Webhook subscriber IDs weren't validated and went unescaped into beehiiv API paths. | Only `sub_<uuid>` is accepted, and IDs are URL-encoded. |
 | 10 | The admin seed route reused the beehiiv secret; admin checks weren't constant-time. | Seed route deleted; the jobs route uses a constant-time comparison. |
-| 11 | Thin headers; stack traces on bad JSON. | `X-Powered-By` off, HSTS on, `frame-ancestors` limited to 10almonds.com and www, `object-src 'none'`; errors reply in one short line. A full script CSP is left for later (the page uses inline scripts). |
+| 11 | Thin headers; stack traces on bad JSON. | `X-Powered-By` off, HSTS on, `frame-ancestors` limited to 10almonds.com, www and staging, `object-src 'none'`; errors reply in one short line. A full script CSP is left for later (the page uses inline scripts). |
 | 12 | One order could credit twice through two gardens; no database constraint. | A unique index on `order_id`, and the duplicate check covers every garden. Refunds don't remove points (pilot rule: correct by hand). |
 | 13 | Plugin: no uninstall cleanup; deactivation might leave queued jobs. | `uninstall.php` removes settings, secret and account marks; jobs are cancelled by hook. A participant counts as linked for purchase points once they've opened My Garden. |
 | 14 | `?pass=` accepted in the query string; email linking could still be switched on; tree-status bypassed the linking rule. | Pass only after `#`; email-based shop linking removed entirely; tree-status uses the same rule. |

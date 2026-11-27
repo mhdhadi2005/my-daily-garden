@@ -22,6 +22,9 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 
+// Sites allowed to show the garden in a frame: 10almonds and its staging site.
+const FRAME_ANCESTORS = "'self' https://10almonds.com https://www.10almonds.com https://staging.10almonds.com";
+
 // Basic protections on every response. Garden pages may be framed only by the
 // garden itself and 10almonds.com (the account page), and never send their
 // address (which can carry a reader's link or pass) to other sites.
@@ -29,7 +32,7 @@ app.use((req, res, next) => {
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Strict-Transport-Security", "max-age=15552000");
-  res.setHeader("Content-Security-Policy", "frame-ancestors 'self' https://10almonds.com https://www.10almonds.com; object-src 'none'; base-uri 'self'");
+  res.setHeader("Content-Security-Policy", `frame-ancestors ${FRAME_ANCESTORS}; object-src 'none'; base-uri 'self'`);
   next();
 });
 
